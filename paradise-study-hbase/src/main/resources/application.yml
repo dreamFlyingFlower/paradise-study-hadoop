@@ -1,0 +1,18 @@
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    url: jdbc:mysql://localhost:3306/hfile?autoReconnect=true&useUnicode=true&useSSL=false&characterEncoding=UTF8&serverTimezone=GMT%2B8
+    username: root
+    password: 52LDforever
+    druid:
+      min-idle: 2
+      query-timeout: 10
+      filter: 
+        log4j:
+          connection-log-enabled: true
+          statement-log-error-enabled: true
+          enabled: true
+          
+mybatis:
+  check-config-location: false
+  mapper-locations: classpath:mappers/*
