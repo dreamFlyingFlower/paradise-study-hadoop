@@ -18,9 +18,13 @@
 
 # 核心
 
-* namenode:存储文件的元数据,如文件名,文件目录结构,文件属性,以及每个文件的块列表和块所在的datanode等
-* datanode:数据节点,在本地文件系统存储文件块数据,以及块数据的校验
-* secondary namenode:监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
+* NameNode:存储文件的元数据,如文件名,文件目录结构,文件属性,以及每个文件的块列表和块所在的datanode等.默认情况下,只有1个namenode,3个datanode
+* DataNode:数据节点,在本地文件系统存储文件块数据,以及块数据的校验
+* Secondary NameNode:监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
+* ResourceManager(rm):处理客户端请求,启动和监控ApplicationMaster,NodeManager,资源分配与调度
+* NodeManager(nm):单个节点上的资源管理,处理来自ResourceManager和ApplicationMaster的命令
+* ApplicationMaster:数据切分,为应用程序申请资源,并分配给内部任务,任务监控和容错
+* Container:对任务运行环境的抽象,封装了CPU,内存等多维资源以及环境变量,启动命令等任务信息
 
 
 
@@ -43,18 +47,16 @@
 
 # 伪分布式
 
-1. 环境为linux,centos7
+1. 环境为linux,centos7.6
 
-2. 下载安装jdk1.8.0_191.tar.gz,hadoop2.9.1.tar.gz,在linux根目录新建文件夹app,新建文件夹java,hadoop
+2. 下载jdk1.8.0.tar.gz,hadoop2.9.1.tar.gz,在linux根目录新建目录app,app下新建目录java,hadoop
 
-3. 复制文件cp src des;不同机器之间复制scp ip:port/src ip:port/des;移动文件mv src des
-
-4. 解压jdk和hadoop到各自文件夹中,tar -zxvf jdk1.8.0_191
+4. 解压jdk和hadoop到各自文件夹中,tar -zxvf jdk1.8.0.tar.gz
 
 5. 解压完成之后配置环境变量,编辑 vi /etc/profile,在文件最底下添加
 
    ```shell
-   JAVA_HOME=/app/java/java1.8.0_191
+   JAVA_HOME=/app/java/java1.8
    CLASSPATH=$JAVA_HOME/lib/
    PATH=$PATH:$JAVA_HOME/bin
    export PATH JAVA_HOME CLASSPATH
@@ -62,16 +64,22 @@
    export PATH=$PATH:$JAVA_HOME/bin:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
    ```
 
-6. 添加完之后命令source /etc/profile,输入java -version,出现版本表示安装成功,输入hadoop出现一版本信息安装成功
+6. 添加完之后命令source /etc/profile,输入java -version,出现版本表示安装成功,输入hadoop出现版本信息安装成功
 
 7. 修改hadoop配置文件,所需配置文件都在/app/hadoop/hadoop-2.9.1/etc/hadoop文件夹下
 
-8. 修改配置文件core-site.xml,在configuration标签中添加如下:value里的值为当前服务器地址,9000默认端口
+7. 修改core-site.xml,在configuration标签中添加:
 
    ```xml
+   <!-- 指定namenode地址,name为名称,可自定义,value为当前服务器地址或主机名,9000默认端口-->
    <property>
    	<name>fs.defaultFS</name>
    	<value>hdfs://192.168.1.146:9000/</value>
+   </property>
+   <!-- 指定hadoop运行时产生文件的存储目录 -->
+   <property>
+   	<name>hadoop.tmp.dir</name>
+   	<value>/app/hadoop/data</value>
    </property>
    ```
 
@@ -79,28 +87,38 @@
 
    ```shell
    #export JAVA_HOME=${JAVA_HOME}
-   export JAVA_HOME=/app/java/jdk1.8.0_191
+   export JAVA_HOME=/app/java/jdk1.8
    ```
 
-10. 修改hdfs-site.xml,在configuration标签添加如下(此文件是namenode节点和datanode结点的存放地址):
+9. 修改hdfs-site.xml,该文件是namenode和datanode的存放地址,在configuration标签添加:
 
-    ```xml
-    <!-- 指定hdfs的副本数量 -->
-    <property>
-    	<name>dfs.replication</name>
-    	<value>1</value>
-    </property>
-    <!-- 指定namenode的存储路径 -->
-    <property>
-    	<name>dfs.name.dir</name>
-    	<value>/app/hadoop/hadoop-2.9.1/namenode</value>
-    </property>
-    <!-- 指定datanode的存储路径 -->
-    <property>
-    	<name>dfs.data.dir</name>
-    	<value>/app/hadoop/hadoop-2.9.1/datanode</value>
-    </property>
-    ```
+   ```xml
+   <!-- 指定hdfs的副本数量,即备份 -->
+   <property>
+   	<name>dfs.replication</name>
+   	<value>1</value>
+   </property>
+   <!-- 指定namenode的存储路径 -->
+   <property>
+   	<name>dfs.name.dir</name>
+   	<value>/app/hadoop/hadoop-2.9.1/namenode</value>
+   </property>
+   <!-- 指定secondary namenode的地址 -->
+   <property>
+   	<name>dfs.namenode.secondary.http.address</name>
+   	<value>http://192.168.1.146:50090</value>
+   </property>
+   <!-- 指定datanode的存储路径 -->
+   <property>
+   	<name>dfs.data.dir</name>
+   	<value>/app/hadoop/hadoop-2.9.1/datanode</value>
+   </property>
+   <!-- 关闭权限 -->
+   <property>
+   	<name>dfs.permissions</name>
+   	<value>false</value>
+   </property>
+   ```
 
 11. 修改mapred-site.xml.template(mv mapred-site.xml.template mapred-site.xml),在configuration下添加:
 
