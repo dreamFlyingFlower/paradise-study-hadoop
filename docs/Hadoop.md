@@ -16,6 +16,41 @@
 
 
 
+# MapReduce
+
+* 是一个分布式运算程序的编程框架,核心功能是将用户编写的业务逻辑代码和自带默认组件整合成一个完整的分布式运算程序,并发运行在一个hadoop集群上
+* MR易于编程,简单的实现一些接口就可以完成一个分布式程序
+* 良好的扩展性
+* 高容错性,即使集群中的一台机器挂掉了,它可以把上面的计算任务转移到另外一个节点上运行
+* 适合PB级别以上海量数据的离线处理
+* MR不适合做实时计算,流式计算,DAG(有向图)计算
+  * 实时计算:因为MR是读取磁盘上的文件,做处理比较慢
+  * 流式计算:流式计算的输入数据是动态的,而MR的输入数据是静态的,这取决于MR的设计特点
+  * DAG:多个应用程序存在依赖关系,后一个应用程序的输入为前一个的输出.在这种情况下,MR作业的结果会写入到磁盘中,会产生大量的磁盘IO,导致性能很低
+* MR的工作流程:
+  * 将文件中的内容按行读取,之后按照空格进行切分
+  * 再开辟空间进行分区排序,排序按字典排序,将结果放在一个类似map的集合中
+  * 排序之后再将相同的项进行合并
+
+
+
+# 生态
+
+* HDFS:解决存储问题
+* MapReduce:解决计算问题
+* Yarn:解决资源调度问题
+* Zookeeper:分布式应用协调服务
+* Flume:日志收集
+* Hive:基于Hadoop的数仓工具,离线计算
+* HBase:分布式,面向列的开源数据源,近实时数据查询
+* Sqoop:数据传递工具
+* Scala:多范式编程语言,面向对象和函数式编程的特性
+* Spark:目前企业常用的批处理离线/实时计算引擎
+* Flink:目前最火的流处理框架,既支持流处理,也支持批处理
+* Elasticsearch:大数据分布式实时弹性搜索引擎
+
+
+
 # 核心
 
 * NameNode:存储文件的元数据,如文件名,文件目录结构,文件属性,以及每个文件的块列表和块所在的datanode等.默认情况下,只有1个namenode,3个datanode
@@ -31,10 +66,12 @@
 # API
 
 * hadoop checknative -a:检查hadoop本地库是否正常,false不正常
-* bin/hadoop fs -put input/ /input:在hadoop目录下执行,上传当前目录input里的文件到/input,注意/input是hadoop隐藏的了,反正我是没看到在什么地方;若是/input存在,则删除bin/hadoop fs -rm -r /input,提示deleted input才表示删除成功
-* hadoop fs -ls /input:查看上传的文件是否成功,成功会列出文件地址,否则报错文件不存在
-* hadoop jar XXX.jar xx.xx.xxx.TestMain /input /output:运行jar包,需要指定main所在类,/input表示上传文件所在地址,/output表示文件输出地址
-* hadoop fs -ls /output:查看运行生成的文件,若有success文件代表成功,我也不知道怎么查看,但是可以从50070的utilities的browse the file system下面查看,可将最后的结果下载下来查看
+* hadoop fs -put file/folder /file:上传linux里的file或folder到hadoop的/file,file可自定义;若是/file存在,则删除hadoop fs -rm -r /file,提示deleted file才表示删除成功
+* hadoop fs -rm -r /file:删除hadoop集群中的文件或目录
+* hadoop fs -ls /file:查看上传的文件是否成功,成功会列出文件地址,否则报错文件不存在
+* hadoop jar XXX.jar xx.xx.xxx.TestMain /input /output:运行jar包,需要指定main所在类,/input表示上传文件所在地址,/output表示文件输出地址,且该地址不能是已经存在的
+* hadoop fs -ls /output:查看运行生成的文件,若有success文件代表成功,可以从50070的utilities的browse the file system下面查看,可将最后的结果下载下来查看
+* hadoop fs -cat /file:查看hadoop中某个文件的内容
 
 
 
@@ -66,9 +103,22 @@
 
 6. 添加完之后命令source /etc/profile,输入java -version,出现版本表示安装成功,输入hadoop出现版本信息安装成功
 
-7. 修改hadoop配置文件,所需配置文件都在/app/hadoop/hadoop-2.9.1/etc/hadoop文件夹下
+6. 真集群模式下,要想让其他机器能访问hadoop启动后的页面需要先关闭防火墙
 
-7. 修改core-site.xml,在configuration标签中添加:
+   ```shell
+   systemctl stop firewalld.service #停止firewall
+   systemctl disable firewalld.service #禁止firewall开机启动
+   firewall-cmd --state #查看默认防火墙状态（关闭后显示notrunning，开启后显示running）
+   vi /etc/selinux/config # 将SELINUX=enforcing改为SELINUX=disabled
+   ```
+
+7. 修改自己的ip地址为静态地址,修改主机名
+
+8. 修改/etc/hosts,配置集群其他主机的ip以及主机名,在伪分布式模式下可不配,真集群需要配置
+
+9. 修改hadoop配置文件,所需配置文件都在/app/hadoop/hadoop-2.9.1/etc/hadoop文件夹下
+
+10. 修改core-site.xml,在configuration标签中添加:
 
    ```xml
    <!-- 指定namenode地址,name为名称,可自定义,value为当前服务器地址或主机名,9000默认端口-->
@@ -83,44 +133,37 @@
    </property>
    ```
 
-9. 修改hadoop-env.sh,修改java的路径
+11. 修改hdfs-site.xml,该文件是namenode和datanode的存放地址,在configuration标签添加:
 
-   ```shell
-   #export JAVA_HOME=${JAVA_HOME}
-   export JAVA_HOME=/app/java/jdk1.8
-   ```
+    ```xml
+    <!-- 指定hdfs的副本数量,即备份 -->
+    <property>
+    	<name>dfs.replication</name>
+    	<value>1</value>
+    </property>
+    <!-- 指定namenode的存储路径 -->
+    <property>
+    	<name>dfs.name.dir</name>
+    	<value>/app/hadoop/hadoop-2.9.1/namenode</value>
+    </property>
+    <!-- 指定secondary namenode的地址 -->
+    <property>
+    	<name>dfs.namenode.secondary.http.address</name>
+    	<value>http://192.168.1.146:50090</value>
+    </property>
+    <!-- 指定datanode的存储路径 -->
+    <property>
+    	<name>dfs.data.dir</name>
+    	<value>/app/hadoop/hadoop-2.9.1/datanode</value>
+    </property>
+    <!-- 关闭权限 -->
+    <property>
+    	<name>dfs.permissions</name>
+    	<value>false</value>
+    </property>
+    ```
 
-9. 修改hdfs-site.xml,该文件是namenode和datanode的存放地址,在configuration标签添加:
-
-   ```xml
-   <!-- 指定hdfs的副本数量,即备份 -->
-   <property>
-   	<name>dfs.replication</name>
-   	<value>1</value>
-   </property>
-   <!-- 指定namenode的存储路径 -->
-   <property>
-   	<name>dfs.name.dir</name>
-   	<value>/app/hadoop/hadoop-2.9.1/namenode</value>
-   </property>
-   <!-- 指定secondary namenode的地址 -->
-   <property>
-   	<name>dfs.namenode.secondary.http.address</name>
-   	<value>http://192.168.1.146:50090</value>
-   </property>
-   <!-- 指定datanode的存储路径 -->
-   <property>
-   	<name>dfs.data.dir</name>
-   	<value>/app/hadoop/hadoop-2.9.1/datanode</value>
-   </property>
-   <!-- 关闭权限 -->
-   <property>
-   	<name>dfs.permissions</name>
-   	<value>false</value>
-   </property>
-   ```
-
-11. 修改mapred-site.xml.template(mv mapred-site.xml.template mapred-site.xml),在configuration下添加:
+12. 修改mapred-site.xml.template,将该文件改名为mapred-site.xml(mv mapred-site.xml.template mapred-site.xml),在configuration下添加:
 
     ```xml
     <!-- 指定mapreduce运行在yarn下 -->
@@ -128,14 +171,25 @@
     	<name>mapreduce.framework.name</name>
     	<value>yarn</value>
     </property>
+    <!-- 历史服务器的地址 -->
+    <property>
+    	<name>mapreduce.jobhistory.address</name>
+    	<value>192.168.1.146:10020</value>
+    </property>
+    <!-- 历史服务器页面的地址 -->
+    <property>
+    	<name>mapreduce.jobhistory.webapp.address>
+    	<value>192.168.1.146:19888</value>
+    </property>
     ```
 
-12. 修改yarn-site.xml,在configuration下添加:
+13. 修改yarn-site.xml,在configuration下添加:
 
     ```xml
     <!-- 指定yarn的老大(resourceManager)的地址 -->
     <property>
     	<name>yarn.resourcemanager.hostname</name>
+        <!-- ip地址或主机名,主机名需要在hosts文件中已经配置过 -->
     	<value>192.168.1.146</value>
     </property>
     <!-- reducer获取数据的方式 -->
@@ -143,19 +197,26 @@
     	<name>yarn.nodemanager.aux-services</name>
     	<value>mapreduce_shuffle</value>
     </property>
+    <!-- 日志聚集功能 -->
+    <property>
+    	<name>yarn.log-aggregation-enable</name>
+    	<value>true</value>
+    </property>
+    <!-- 日志保留时间,单位秒 -->
+    <property>
+    	<name>yarn.log-aggregation.retain-seconds</name>
+    	<value>604800</value>
+    </property>
     ```
 
-13. 修改slaves文件,加入自己的ip地址,删除localhost
-
-14. 查看自己linux的ip地址:ifconfig,不是127.0.0.1的那个就是
-
-15. 要想让其他机器能访问hadoop启动后的页面需要先关闭防火墙
+14. 修改hadoop-env.sh,yarn-env.sh,mapred-env.sh,修改或添加jdk的路径
 
     ```shell
-    systemctl stop firewalld.service #停止firewall
-    systemctl disable firewalld.service #禁止firewall开机启动
-    firewall-cmd --state #查看默认防火墙状态（关闭后显示notrunning，开启后显示running）
+    #export JAVA_HOME=${JAVA_HOME}
+    export JAVA_HOME=/app/java/jdk1.8
     ```
+
+15. 修改slaves文件,加入自己的ip地址或主机名,若是真正的集群模式,需要写其他节点的ip或主机名,每一台主机都要写相同的内容
 
 16. 免密钥登录,必须配置
 
@@ -169,10 +230,54 @@
 17. 首次启动hadoop
 
     1. hdfs namenode -format
-    2. 若是有错误或没有启动成功,需要再次format的时候,需要先进入namenode和datanode文件夹,删除里面的current文件夹,否则会出现namespaceid不一致的问题
+    2. 若是有错误或启动失败,需要先进入namenode和datanode目录,删除里面的current目录,否则会出现namespaceid不一致的问题.若不成功,可以直接删除data目录和log目录,之后再format
 
 18. 启动start-dfs.sh,输入jps查看会显示DataNode,NameNode,SecondaryNameNode,少了就重新format.若出现有些程序已经启动,则先要kill -9 进程号,结束这些进程
 
-19. 启动start-yarn.sh,输入jps查看,会比上一个多显示NodeManager和ResouceManager
+19. 启动start-yarn.sh,输入jps查看,会比上一个多显示NodeManager和ResouceManager.若是真正集群模式,yarn配置在那台机器上,就在那台机器上启动
 
 20. 访问192.168.1.146:8088和192.168.1.146:50070,若能出现网站表示成功;若需要访问jobhistory,需要命令mapred historyserver,之后在页面访问192.168.1.146:19888
+
+21. 其他命令:
+
+    1. mr-jobhistory-daemon.sh start|stop historyserver:启动/停止历史服务器
+    2. yarn-daemon.sh start|stop resourcemanager:启动/停止总资源管理器
+    3. yarn-daemon.sh start|stop nodemanager:启动/停止节点管理器
+
+
+
+# Flume
+
+
+
+## 概述
+
+* 提供一个分布式的,可靠的,对大数据量的日志进行高效收集,聚集,移动的服务
+* Flume基于流式框架,容错性强,只能在linux下运行
+* Flume,Kafka用来实时进行数据收集,Spark,Storm用来实时处理数据,impala实时查询
+* Source监控某个文件或数据流,数据源产生新的数据,拿到该数据后,将数据封装在一个Event中,并put到channel后commit提交,channel队列先进先出,sink去channel中拉取数据,写到HDFS中
+
+
+
+## 角色
+
+* Source:用于采集数据,source是产生数据流的地方,同事source会将产生的数据流传到channel
+* Channel:用于桥接Sources和Sinks,类似于一个队列
+* Sink:从Channel收集数据,将数据写到目标源,源可以是一个Source,也可以是HDFS或HBase
+* Event:传输单元,Flume数据传输的基本单元,以事件的形式将数据从源头送到目的地
+
+
+
+## 安装部署
+
+* JDK安装,配置环境变量
+
+* 上传解压flume压缩包,修改flume-env.sh.template为fluem-env.sh
+
+* 修改flume-env.sh,添加java_home
+
+  ```shell
+  export JAVA_HOME=/app/java/jdk1.8
+  ```
+
+* 新建一个目录jobconf,将所有的任务都统一放在里面

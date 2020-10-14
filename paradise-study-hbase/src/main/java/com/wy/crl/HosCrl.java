@@ -3,6 +3,7 @@ package com.wy.crl;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -128,6 +129,7 @@ public class HosCrl {
 
 	/**
 	 * 上传文件或创建目录
+	 * 
 	 * @param bucket 需要创建或上传的文件名称
 	 * @param key 关键字
 	 * @param mediaType 文件类型
@@ -164,33 +166,33 @@ public class HosCrl {
 				attrs.put(header.replace(HOSConst.COMMON_ATTR_PREFIX, ""), request.getHeader(header));
 			}
 		}
+		// put dir object
+		if (key.endsWith(File.separator)) {
+			if (file != null) {
+				response.setStatus(HttpStatus.BAD_REQUEST.value());
+				file.getInputStream().close();
+				return null;
+			}
+			hosStoreService.put(bucket, key, null, 0, mediaType, attrs);
+			response.setStatus(HttpStatus.OK.value());
+			return "success";
+		}
+		if (file == null || file.getSize() == 0) {
+			response.setStatus(HttpStatus.BAD_REQUEST.value());
+			response.getWriter().write("object content could not be empty");
+			return "object content could not be empty";
+		}
 		ByteBuffer buffer = null;
 		File distFile = null;
+		FileInputStream fis = null;
 		try {
-			// put dir object
-			if (key.endsWith(File.separator)) {
-				if (file != null) {
-					response.setStatus(HttpStatus.BAD_REQUEST.value());
-					file.getInputStream().close();
-					return null;
-				}
-				hosStoreService.put(bucket, key, null, 0, mediaType, attrs);
-				response.setStatus(HttpStatus.OK.value());
-				return "success";
-			}
-			if (file == null || file.getSize() == 0) {
-				response.setStatus(HttpStatus.BAD_REQUEST.value());
-				response.getWriter().write("object content could not be empty");
-				return "object content could not be empty";
-			}
-
 			if (file != null) {
 				if (file.getSize() > MAX_FILE_IN_MEMORY) {
 					distFile = new File(TMP_DIR + File.separator + UUID.randomUUID().toString());
 					file.transferTo(distFile);
 					file.getInputStream().close();
-					buffer = new FileInputStream(distFile).getChannel().map(FileChannel.MapMode.READ_ONLY, 0,
-							file.getSize());
+					fis = new FileInputStream(distFile);
+					buffer = fis.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, file.getSize());
 				} else {
 					ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
 					org.apache.commons.io.IOUtils.copy(file.getInputStream(), outputStream);
@@ -200,7 +202,7 @@ public class HosCrl {
 			}
 			hosStoreService.put(bucket, key, buffer, file.getSize(), mediaType, attrs);
 			return "success";
-		} catch (Exception e) {
+		} catch (IOException e) {
 			log.error(e.toString());
 			response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
 			response.getWriter().write("server error");
@@ -209,12 +211,11 @@ public class HosCrl {
 			if (buffer != null) {
 				buffer.clear();
 			}
+			if (fis != null) {
+				fis.close();
+			}
 			if (file != null) {
-				try {
-					file.getInputStream().close();
-				} catch (Exception e) {
-					// nothing to do
-				}
+				file.getInputStream().close();
 			}
 			if (distFile != null) {
 				distFile.delete();
