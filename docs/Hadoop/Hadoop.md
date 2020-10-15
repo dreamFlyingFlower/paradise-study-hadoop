@@ -4,7 +4,7 @@
 
 # 概述
 
-* 主要由HDFS,MR,YARN,COMMON组成
+* 主要由HDFS,MR,YARN,COMMON组成,1.0中Yarn的功能由MR实现,2.0中独立出来
 * HDFS:Hadoop Distributed File System,高可靠,高吞吐量的分布式文件系统
 * MR:MapReduce,分布式离线并行计算框架
 * YARN:作业调度与集群资源管理的框架
@@ -13,6 +13,19 @@
 * 高扩展性:在集群间分配任务数据,可方便的扩展数以千计的节点
 * 高效性:在MR的思想下,hadoop是并行工作的
 * 高容错性:自动保存多份副本数据,并且能够自动将失败的任务重新分配
+
+
+
+# 应用场景
+
+* 物流仓储:大数据分析系统助力商家精细化运营,提升销量,节约成本
+* 零售:分析用户消费习惯,为用户购买商品提供方便,从而提升商品销量
+* 旅游:深度结合大数据能力与旅游行业需求,共建旅游产业智慧管理,智慧服务和智慧营销的未来
+* 商品广告推荐:给用户推荐可能喜欢的商品
+* 保险:海量数据挖掘以及风险预测,助力保险行业精准营销,提升精细化定价能力
+* 金融:多维度体现用户特征,帮助金融机构推荐优质客户,防范欺诈风险
+* 房产:大数据全面助力房地产行业,打造精准投策和营销,选出合适的地,建合适的楼,卖合适的人
+* 人工智能:大数据+算法
 
 
 
@@ -56,8 +69,14 @@
 * NameNode:存储文件的元数据,如文件名,文件目录结构,文件属性,以及每个文件的块列表和块所在的datanode等.默认情况下,只有1个namenode,3个datanode
 * DataNode:数据节点,在本地文件系统存储文件块数据,以及块数据的校验
 * Secondary NameNode:监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
-* ResourceManager(rm):处理客户端请求,启动和监控ApplicationMaster,NodeManager,资源分配与调度
-* NodeManager(nm):单个节点上的资源管理,处理来自ResourceManager和ApplicationMaster的命令
+* ResourceManager(rm):资源管理
+  * 处理客户端请求
+  * 监控NodeManager
+  * 启动和监控ApplicationMaster,NodeManager
+  * 资源分配与调度
+* NodeManager(nm):节点管理
+  * 单个节点上的资源管理
+  * 处理来自ResourceManager和ApplicationMaster的命令
 * ApplicationMaster:数据切分,为应用程序申请资源,并分配给内部任务,任务监控和容错
 * Container:对任务运行环境的抽象,封装了CPU,内存等多维资源以及环境变量,启动命令等任务信息
 
@@ -121,16 +140,16 @@
 10. 修改core-site.xml,在configuration标签中添加:
 
    ```xml
-   <!-- 指定namenode地址,name为名称,可自定义,value为当前服务器地址或主机名,9000默认端口-->
-   <property>
-   	<name>fs.defaultFS</name>
-   	<value>hdfs://192.168.1.146:9000/</value>
-   </property>
-   <!-- 指定hadoop运行时产生文件的存储目录 -->
-   <property>
-   	<name>hadoop.tmp.dir</name>
-   	<value>/app/hadoop/data</value>
-   </property>
+<!-- 指定namenode地址,name为名称,可自定义,value为当前服务器地址或主机名,9000默认端口-->
+<property>
+    <name>fs.defaultFS</name>
+    <value>hdfs://192.168.1.146:9000/</value>
+</property>
+<!-- 指定hadoop运行时产生文件的存储目录 -->
+<property>
+    <name>hadoop.tmp.dir</name>
+    <value>/app/hadoop/data</value>
+</property>
    ```
 
 11. 修改hdfs-site.xml,该文件是namenode和datanode的存放地址,在configuration标签添加:
@@ -232,13 +251,22 @@
     1. hdfs namenode -format
     2. 若是有错误或启动失败,需要先进入namenode和datanode目录,删除里面的current目录,否则会出现namespaceid不一致的问题.若不成功,可以直接删除data目录和log目录,之后再format
 
-18. 启动start-dfs.sh,输入jps查看会显示DataNode,NameNode,SecondaryNameNode,少了就重新format.若出现有些程序已经启动,则先要kill -9 进程号,结束这些进程
+18. 启动/停止:start-dfs.sh/stop-dfs.sh,jps显示DataNode,NameNode,SecondaryNameNode则正常
 
-19. 启动start-yarn.sh,输入jps查看,会比上一个多显示NodeManager和ResouceManager.若是真正集群模式,yarn配置在那台机器上,就在那台机器上启动
+    1. 若出现有些程序已经启动,则先要kill -9 进程号,结束这些进程
+    2. hadoop-daemon.sh start/stop namenode/datanode/secondarynamenode:单独启动某一个模块
 
-20. 访问192.168.1.146:8088和192.168.1.146:50070,若能出现网站表示成功;若需要访问jobhistory,需要命令mapred historyserver,之后在页面访问192.168.1.146:19888
+19. 启动/停止:start-yarn.sh/stop-yarn.sh,jps显示NodeManager和ResouceManager则正常
 
-21. 其他命令:
+    1. 伪分布式模式下,都在一台服务器,需要启动
+    2. 真正集群模式,yarn配置在那台机器上,就在那台机器上启动,其他机器启动会报错
+    3. yarn-daemon.sh start/stop resourcemanager/nodemanager:单独启动一个模块
+
+20. 访问192.168.1.146:8088,192.168.1.146:50070,192.168.1.146:19888,若能出现网站表示成功
+
+21. 启动历史服务器:sbin/mr-jobhistory-daemon.sh start historyserver
+
+22. 其他命令:
 
     1. mr-jobhistory-daemon.sh start|stop historyserver:启动/停止历史服务器
     2. yarn-daemon.sh start|stop resourcemanager:启动/停止总资源管理器

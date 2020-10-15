@@ -1,64 +1,92 @@
 # HBase
 
-# 简介
 
-## 相关概念
+
+# 概念
+
+* 是一个分布式的,面向列的,可扩展的开源数据库,适用于非结构化数据的存储
 
 * NameSpace:可以理解为关系型数据库的数据库
+
 * Table:必须是在文件路径中合法的名字,会映射在HDFS上的文件
-* Row:在表里面,每行代表一个数据对象,每行都是一个行键(Row Key)进行唯一标识.行键可以是任何类型,在库中以二进制的字节存储
+
+* Row:在表里面,每行代表一个数据对象,每行都是一个行键(Row Key)进行唯一标识.行键可以是任何类型,在库中以字节存储
+
 * RowKey:唯一标识,类似于主键,不可更改,只能删除后重新插入
+
 * Column:列由Column family和Column qualifier组成,访问数据时用冒号(:)分割开
+
 * Column family(CF):类似传统数据库的字段名,又称为列簇.和传统字段不同的是,CF中存储的数据类似于键值对,而其中的键值就是ColumnQualifier(CQ或Key),可以有多个CQ.这就相当于CF下又有字段,而真正的值则是存储于CQ下.一个表中可以有多个CF,也可以只有一个CF,需要根据实际情况而定.例如:userinfo{"username":"ddd","email":"12@ali.com"},password{"pwd":"123456"}.其中userinfo就是一个CF,其中的username是CQ,ddd是值(CellValue).password是另外一个CF
+
 * Column qualifier:列簇中的数据通过列标识来进行映射,可以认为是key,如上个例子中的userinfo中的username,email
-* Cell:每一个行键(rowkey),CF和CQ共同组成一个单元,值可以是任意类型,以2进制字节存储
-* Timestamp:每个值都会有一个timestamp,作为该值特定版本的标识符.若插入数据时不指定该值,则默认为当前时间戳;若查询时不指定时间戳,默认查询最新版本的值.Timestamp由HBase进行单独维护,默认只会维持3个版本的数据
+
+* Cell:每一个行键(rowkey),CF和CQ共同组成一个单元,值可以是任意类型,以字节存储
+
+* Timestamp:每个值都会有一个timestamp,作为该值特定版本的标识符
+
+  * 插入数据时若不指定该值,则默认为当前时间戳
+  * 查询时若不指定时间戳,默认查询最新版本的值
+  * Timestamp由HBase进行单独维护,默认只会维持3个版本的数据
+
 * HBase与传统的关系型数据库的区别在于:
 
->HBase处理的数据为PB级别,而传统数据库处理的一般是GB,TB数据
-	HBase只处理字节数据,而传统数据库的数据类型很丰富
-	HBase只支持单行ROW的ACID
-	HBase只支持rowkey的索引
-	HBase的吞吐量是百万级别/每秒,传统数据库数千/每秒
+  * HBase处理的数据为PB级别,而传统数据库处理的一般是GB,TB数据
+  * HBase只处理字节数据,而传统数据库的数据类型很丰富
+  * HBase只支持单行ROW的ACID
+  * HBase只支持rowkey的索引
+  * HBase的吞吐量是百万级别/每秒,传统数据库数千/每秒
 
+* HBase是基于HDFS系统进行数据存储,类似于Hive,但在Hadoop上提供了类似于Bigtable的能力
 
+* 适合于非结构化数据的存储,如图片等,适合用来进行大数据的实时查询
 
-## 理解运行
-
-* 是一个分布式的,面向列的,可扩展的开源数据库
-* HBase是基于Hadoop的核心HDFS(分布式存储系统)系统进行数据存储,类似于HIVE,但在Hadoop上提供了类似于Bigtable的能力
-* 适合于非结构化数据的存储,如图片等
-* 适合用来进行大数据的实时查询
 * HBase提供了对数据的随机实时读写访问功能
-* HBase内部使用哈希表,并存储索引,可将在HDFS文件中的数据进行快速查找
+
+* HBase内部使用哈希表,并存储索引,可将在HDFS中的数据进行快速查找
+
 * HBase不适用于有join,多级索引,表关系复杂的数据模型
-* HBase由Java Api(提供查询),Hmaster,RegionServer和自带的zk组成,基于Hadoop
-* HMaster:中央节点,将region分配给regionserver,协调regionserver的负载均衡并维护集群状态;维护表和Region的元数据,但是不参与数据的输入/输出过程.多个Hmaster可以共存,但同时只会有一个Master在运行,其他处于待机状态.在HBase启动的时候,会将所有表信息,region信息(region开始key和结束key,所在regionserver的地址等)全部加载到HMaster中
-* RegionServer:维护Master分配给他的Region,处理对这些region的请求,负责切分正在运行的逐渐变的过大的region,保证查询效率.每个RegionServer只会处理一个CF的数据,当CF的数据值达到某个阀值时,会划分出更多的Region来存储CF数据.
+
+* HBase由Java Api(提供查询),Hmaster,RegionServer和自带的zk组成
+
+  > RowKey			Timestamp					CF1								CF2
+  >
+  > ​														col1			col2					col1	col2
+  >
+  > rowkey1			timestamp1		value1		value2		value1		value2
+
+
+
+# 核心
+
+* HMaster:中央节点
+  * 将Region分配给regionserver,监控,协调Regionserver的负载均衡并维护集群状态
+  * 维护表和Region的元数据,但是不参与数据的输入/输出过程
+  * 多个Hmaster可以共存,但同时只会有一个Master在运行,其他处于待机状态
+  * 在HBase启动的时候,会将所有表,Region信息(region开始key和结束key,所在regionserver的地址等)全部加载到HMaster中
+* RegionServer:区域服务调度,实际数据处理
+  * 维护Master分配给他的Region,处理对这些Region的请求
+  * 负责切分正在运行的逐渐变的过大的Region,保证查询效率
+  * 每个RegionServer只会处理一个CF的数据,当CF的数据值达到某个阀值时,会划分更多的Region来存储CF数据
+  * 维护HLog,执行压缩
+  * 运行在DataNode上,数量可以与DataNode数量相同
 * Region:是HBase存储的最小单元,是HBase的基本单位
-* Store:每个Region中都会包含一个或多个Store,用来接受和访问数据
+* Store:每个Region中都会包含一个或多个Store,用来接收和访问数据
 * MemStore:每个Store中都会存在一个MemStore,是数据在内存中的实体,而且是有序的.当内存中的数据达到一定值之后,会创建一个Storefile,并将内存中的数据转入到Storefile中
 * Storefile:由MemStore创建,是数据最终在HBase中的存储的位置.Storefile是HFile的一层封装,HFile是HDFS的基础,此时数据就将存储到HDFS中
-* HLog:存在于每个RegionServer中,只有一个,是为了保证内存中的数据不丢失而存在,类似于Mysql的bin.log.先会在HLog中写入更新操作的日志,之后才会在MemStore中写入数据
+* HLog:存在于每个RegionServer中,只有一个,是为了保证内存中的数据不丢失而存在,类似于Mysql的bin.log.数据会先在HLog中写入更新操作的日志,之后才会在MemStore中写入数据
 * HBase启动
-
->
-	1.将自己注册到zk的backup节点中,因为开始时会有多个HMaster节点,需要进行抢占才能成为活动的HMaster
-	2.抢占完成之后会将该节点从backup节点中删除,此时HMaster才会开始初始化一些数据,之后HMaster将等待RegionServer汇报.
-	3.此时RegionServer在zk中注册,并向HMaster汇报,HMaster就会存储可以使用的RegionServer信息,同时开始分配任务.
-	4.对所有RegionServer(包括已经失效的)数据进行整理,分配Region和Meta信息,将这些信息交给zk
+  * 将自己注册到zk(zookeeper)的backup节点中,因为开始时会有多个HMaster节点,需要进行抢占才能成为活动的HMaster
+  * 抢占完成之后会将该节点从backup节点中删除,此时HMaster才会开始初始化一些数据,之后HMaster将等待RegionServer汇报
+  * 此时RegionServer在zk中注册,并向HMaster汇报,HMaster就会存储可以使用的RegionServer信息,同时开始分配任务
+  * 对所有RegionServer(包括已经失效的)数据进行整理,分配Region和Meta信息,将这些信息交给zk
 
 * RegionServer失效
-
->
-	1.HMaster将失效的RegionServer上的Region分配到其他节点
-	2.HMaster更新hbase:meta表以保证数据正常访问
+  * HMaster将失效的RegionServer上的Region分配到其他节点
+  * HMaster更新hbase:meta表以保证数据正常访问
 
 * HMaster失效
-
->
-	1.由zk中处于backup状态的其他HMaster节点推选一个转为Active状态.这是集群状态下的操作.推选出之后正常运行
-	2.若是非集群,HMaster挂了,数据仍旧能正常读写,因为是由RegionServer来完成,但是不能创建删除表,也不能更改表结构
+  * 集群模式下,由zk中处于backup状态的其他HMaster节点推选一个转为Active状态
+  * 非集群模式下,HMaster挂了,数据仍旧能正常读写,因为是由RegionServer来完成,但是不能创建删除表,也不能更改表结构
 
 
 
@@ -84,7 +112,7 @@
 
 
 
-## HBase不足与优化
+# 特性
 
 * 对小文件支持比较好,对大文件的支持无法满足
 * 因HBase的设计,会发生比较耗时的compact和split操作,文件存储会比较频繁的触发这些操作
@@ -97,230 +125,93 @@
 * 通过rowkey设计使其支持起始文件检索,文件前缀匹配等
 * 对象存储本身并不需要复杂的检索操作
 * 对配置文件中的相关配置进行特殊处理:
-
->
-	hbase.regionserver.handler.count:rpc请求线程数,默认是10
-	hbase.hregion.max.filesize:当region的大小大于设定值后就开始split
-	hbase.hregion.majorcompaction:majorcompaction的执行周期,默认是1天执行一次
-	hbase.hstore.compaction.min:每个store里的storefile总数超过该值,触发合并操作
-	hbase.hstore.compaction.max:一次最多合并多少个storefile
-	hbase.hstore.blockingStoreFile:region中的store里的storefile超过该值时,则block所有的写请求执行compaction
-	hfile.block.cache.size:regionserver的blockcache的内存大小限制
-	hbase.hregion.memstore.flush.size:mmestore超过该值将执行flush,默认128M
-	hbase.hregion.memstore.block.multiplier:若memstore的大小超过flush.size*multiplier,会阻塞该memstore的写操作
+  * hbase.regionserver.handler.count:rpc请求线程数,默认是10
+  * hbase.hregion.max.filesize:当region的大小大于设定值后就开始split
+  * hbase.hregion.majorcompaction:majorcompaction的执行周期,默认是1天执行一次
+  * hbase.hstore.compaction.min:每个store里的storefile总数超过该值,触发合并操作
+  * hbase.hstore.compaction.max:一次最多合并多少个storefile
+  * hbase.hstore.blockingStoreFile:region中的store里的storefile超过该值时,则block所有的写请求执行compaction
+  * hfile.block.cache.size:regionserver的blockcache的内存大小限制
+  * hbase.hregion.memstore.flush.size:mmestore超过该值将执行flush,默认128M
+  * hbase.hregion.memstore.block.multiplier:若memstore的大小超过flush.size*multiplier,会阻塞该memstore的写操作
 
 * 常用优化:预先分区,rowkey优化,column优化,scheme优化
-
 * 预先分区:HBase在建表的时候默认只会在一个resionserver上建立一个region分区,可以在建表的时候预先创建一些空的region,根据rowkey来设定region的起始值和结束值,有目的的进行数据存储,减少region的split操作.同时可以将频繁访问的数据放在多个region中,将访问比较少的数据放在一个或几个region中,合理分配资源
-
 * rowkey优化:利用hbase默认排序特点,将一起访问的数据放在一起,也就是一个CF中;防止热点问题,避免使用时序或单调的递增递减等.热点就是在集群中,大量的请求访问单个或少量几个数据,大量的访问是的这些服务器超出自身的处理能力,从而导致整个集群的性能下降.尽量减少rowkey字节数,尽量短
-
 * column优化:字段尽量短,一张表里的CF尽量不要超过3个
-
 * schema优化:
-
->
-	宽表:列多行少,每行存储的数据多,事务更好,因为hbase只支持行事务,不支持其他类型事务
-	高表:列少行多,每列存储的数据多,查询来说,高表更好.但是开销更大,因为rowkey更多,region更多
+  * 宽表:列多行少,每行存储的数据多,事务更好,因为hbase只支持行事务,不支持其他类型事务
+  * 高表:列少行多,每列存储的数据多,查询来说,高表更好.但是开销更大,因为rowkey更多,region更多
 
 * 写优化策略,同步提交或异步提交;WAL优化,是否必须,持久化等;Scan缓存设置,批量获取;BlockCache配置是否合理,HFile是否过多
 
 
 
-# 配置Hadoop
+# 安装
 
-1.下载安装jdk1.8.0_191.tar.gz,hadoop2.9.1.tar.gz,在linux根目录新建文件夹app,新建文件夹java,hadoop
+* 下载解压hbase安装包,解压后进入配置文件夹conf,复制hadoop的hdfs-site.xml和core-site.xml到hbase的conf文件夹下.[配置](http://abloz.com/hbase/book.html#hbase_default_configurations)
 
-2.解压jdk和hadoop到各自文件夹中,配置环境变量,编辑 vi /etc/profile,在文件最底下添加
+* 修改hbase-env.sh
 
->
-	JAVA_HOME=/app/java/java1.8.0_191(jdk安装目录)
-	CLASSPATH=$JAVA_HOME/lib/
-	PATH=$PATH:$JAVA_HOME/bin
-	export PATH JAVA_HOME CLASSPATH
-	export HADOOP_HOME=/app/hadoop/hadoop-2.9.1(hadoop安装目录)
-	export PATH=$PATH:$JAVA_HOME/bin:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
-	添加完之后命令source /etc/profile,输入java -version,出现版本表示安装成功,输入hadoop出现一版本信息安装成功
+  ```shell
+  # jdk路径
+  export JAVA_HOME=/app/java/jdk1.8.0
+  # 给hbase分配的内存空间
+  # export HBASE_MASTER_OPTS="$HBASE_MASTER_OPTS -XX:PermSize=128m ..."
+  # export HBASE_REGIONSERVER_OPTS="$HBASE_REGIONSERVER_OPTS..."
+  # 是否使用hbase自带的zk,true表示使用
+  export HBASE_MANAGES_ZK = true
+  ```
 
-3.修改hadoop配置文件,所需配置文件在/app/hadoop/hadoop-2.9.1/etc/hadoop下,其中core-site.xml,hadoop-env.sh,hdfs-site.xml是和hadoop相关的配置,yarn-site.xml,mapred-site.xml.template是和mapreduce相关的配置
+* 修改hbase-site.xml,在configuration标签添加如下:
 
-4.修改core-site.xml,在configuration标签中添加如下(value里的值为当前服务器地址,9000默认端口):
+  ```xml
+  <!-- 指定hbase的根目录,基于hadoop的ip:端口,加上自定义的文件夹名,会在hbase启动时自动在hadoop下创建 -->
+  <property>
+  	<name>hbase.rootdir</name>
+  	<value>hdfs://localhost:9000/hbase</value>
+  </property>
+  <!-- 指定hbase自带的zookeeper的存储路径 -->
+  <property>
+  	<name>hbase.zookeeper.property.dataDir</name>
+  	<value>/app/hadoop/hadoop-2.9.1/zookeeper</value>
+  </property>
+  <!-- 指定hbase是否以集群的方式运行 -->
+  <property>
+  	<name>hbase.cluster.distributed</name>
+  	<value>true</value>
+  </property>
+  <!-- 若是hbase-env中的关于zk的配置为false时,需要配置以下参数,第1个是使用的zk的ip,第2个是zk的端口 -->
+  <property>
+  	<name>hbase.zookeeper.quorum</name>
+  	<value>localhost</value>
+  </property>
+  <property>
+  	<name>hbase.zookeeper.property.clientPort</name>
+  	<value>2181</value>
+  </property>
+  <!-- memstore的内存刷新大小,默认128M,可以设置成256M,单位为字节 -->
+  <property>
+  	<name>hbase.hregion.memstore.flush.size</name>
+  	<value>268435456</value>
+  </property>
+  <!-- 最大storefile大小,超过这个大小,hbase将开始合并storefile,而存储这个storefile的region将被切割,默认是10G -->
+  <property>
+  	<name>hbase.hregion.max.filesize</name>
+  	<value>10737418240</value>
+  </property>
+  <!-- region中所有storefile的major compactions时间间隔,默认1天,0表示禁用这个功能 -->
+  <property>
+  	<name>hbase.hregion.majorcompaction</name>
+  	<value>0</value>
+  </property>
+  ```
 
->
-	<property>
-		<name>fs.defaultFS</name>
-		<value>hdfs://192.168.1.146:9000/</value>
-	</property>
+* 启动hbase:进入hbase/bin下,sh start-hbase.sh,会显示启动了zk,master,regionserver
 
-5.修改hadoop-env.sh,修改java的路径
+* jps:显示HMaster,HRegionServer,HQuorumPeer
 
->
-	#export JAVA_HOME=${JAVA_HOME}
-	export JAVA_HOME=/app/java/jdk1.8.0_191
-
-6.修改hdfs-site.xml,在configuration标签添加如下(此文件是namenode节点和datanode节点的存放地址):
-
->
-	<!-- 指定hdfs的副本数量 -->
-	<property>
-		<name>dfs.replication</name>
-		<value>1</value>
-	</property>
-	<!-- 指定namenode的存储路径 -->
-	<property>
-		<name>dfs.name.dir</name>
-		<value>/app/hadoop/hadoop-2.9.1/namenode</value>
-	</property>
-	<!-- 指定datanode的存储路径 -->
-	<property>
-		<name>dfs.data.dir</name>
-		<value>/app/hadoop/hadoop-2.9.1/datanode</value>
-	</property>
-
-7.修改mapred-site.xml.template(mv mapred-site.xml.template mapred-site.xml),在configuration下添加:
-
->
-	<!-- 指定mapreduce运行在yarn下 -->
-	<property>
-		<name>mapreduce.framework.name</name>
-		<value>yarn</value>
-	</property>
-
-8.修改yarn-site.xml,在configuration下添加:
-
->
-	<!-- 指定yarn的老大(resourceManager)的地址 -->
-	<property>
-		<name>yarn.resourcemanager.hostname</name>
-		<value>192.168.1.146</value>
-	</property>
-	<!-- reducer获取数据的方式 -->
-	<property>
-		<name>yarn.nodemanager.aux-services</name>
-		<value>mapreduce_shuffle</value>
-	</property>
-
-9.修改slaves文件,加入自己的ip地址,删除localhost,关闭防火墙
-
->
-	systemctl stop firewalld.service #停止firewall
-	systemctl disable firewalld.service #禁止firewall开机启动
-
-10.首次启动hadoop
-
->
-	在hadoop的安装目录/bin下执行:./hdfs namenode -format
-	提示信息中的Exiting with status 0表示执行成功
-	若是有错误或没有启动成功,需要再次format的时候,需要先进入namenode和datanode文件夹,删除里面的current文件夹,否则会出现namespaceid不一致的问题
-
-11.启动hadoop和yarn
-
->
-	进入hadoop目录/sbin
-	./start-dfs.sh,等待启动完成
-	输入jps查看会显示DataNode,NameNode,SecondaryNameNode,少了就重新format.
-	若出现有些程序已经启动,则先要先结束这些进程(kill -9 进程号)
-	./start-yarn.sh,等待启动完成,jps查看,会比上一个多显示NodeManager和ResouceManager
-
-12.hadoop相关操作
-
->
-	进入hadoop目录/bin中,查看根目录:./hdfs dfs -ls /
-	新建文件夹:./hdfs dfs -mkdir /test
-
-13.访问ip:8088和ip:50070,若能出现网站表示成功;若需要访问jobhistory,需要命令mapred historyserver,之后在页面访问ip:19888
-
-14.免密钥登录,必须配置
-
->
-	进入到/home文件夹,输入ssh-keygen -t rsa,连着回车确认
-	完成后会生成会生成两个文件id_rsa(私钥),id_rsa.pub(公钥)
-	将公钥复制到要免登录的机器上scp id_rsa.pub 192.168.1.111:/home
-	将公钥复制到密钥列表cat ~/id_rsa.pub >> ./authorized_keys
-	若没有authorized_keys文件,则自己新建touch authorized_keys,并改权限为600
-	验证是否成功:ssh localhost,首页登录需要密码确认,yes即可
-
-* 一些hadoop命令
-
->
-	hadoop checknative -a:检查hadoop本地库是否正常,false不正常
-	bin/hadoop fs -put input/ /input:在hadoop目录下执行,上传当前目录input里的文件到/input,注意/input是hadoop隐藏的了,反正我是没看到在什么地方;若是/input存在,则删除bin/hadoop fs -rm -r /input,提示deleted input才表示删除成功
-	hadoop fs -ls /input:查看上传的文件是否成功,成功会列出文件地址,否则报错文件不存在
-	hadoop jar XXX.jar xx.xx.xxx.TestMain /input /output:运行jar包,需要指定main所在类,/input表示上传文件所在地址,/output表示文件输出地址
-	hadoop fs -ls /output:查看运行生成的文件,若有success文件代表成功,我也不知道怎么查看,但是可以从50070的utilities的browse the file system下面查看,可将最后的结果下载下来查看
-
-* 一些配置修改
-
->
-	1.设置集群block的备份数,hdfs-site.xml文件中dfs.replication的value值改成想要的值,但是要重启hadoop
-	2.设置集群block的备份数,命令bin/hadoop fs -setrep -R 3 /;不需要重启
-
-
-
-# 配置HBase
-
-1.下载解压hbase安装包,解压后进入配置文件夹conf,复制hadoop的hdfs-site.xml和core-site.xml到hbase的conf文件夹下.[配置](http://abloz.com/hbase/book.html#hbase_default_configurations)
-
-2.修改hbase-env.sh,修改java的路径
-
->
-	#export JAVA_HOME=${JAVA_HOME}
-	export JAVA_HOME=/app/java/jdk1.8.0_191
-	注释掉以下2行:export HBASE_MASTER_OPTS="$HBASE_MASTER_OPTS -XX:PermSize=128m ..."
-	export HBASE_REGIONSERVER_OPTS="$HBASE_REGIONSERVER_OPTS..."
-	# 该行表示是否使用hbase自带的zk,tree表示使用,false表示不使用
-	export HBASE_MANAGES_ZK = tree
-
-3.修改hbase-site.xml,在configuration标签添加如下:
-
->
-	<!-- 指定hbase的根目录,基于hadoop的ip:端口,加上自定义的文件夹名,会在hbase启动时自动在hadoop下创建 -->
-	<property>
-		<name>hbase.rootdir</name>
-		<value>hdfs://localhost:9000/hbase</value>
-	</property>
-	<!-- 指定hbase自带的zookeeper的存储路径 -->
-	<property>
-		<name>hbase.zookeeper.property.dataDir</name>
-		<value>/app/hadoop/hadoop-2.9.1/zookeeper</value>
-	</property>
-	<!-- 指定hbase是否以集群的方式运行 -->
-	<property>
-		<name>hbase.cluster.distributed</name>
-		<value>true</value>
-	</property>
-	<!-- 若是hbase-env中的关于zk的配置为false时,需要配置以下参数,第1个是使用的zk的ip,第2个是zk的端口 -->
-	<property>
-		<name>hbase.zookeeper.quorum</name>
-		<value>localhost</value>
-	</property>
-	<property>
-		<name>hbase.zookeeper.property.clientPort</name>
-		<value>2181</value>
-	</property>
-	<!-- memstore的内存刷新大小,默认128M,可以设置成256M,单位为字节 -->
-	<property>
-		<name>hbase.hregion.memstore.flush.size</name>
-		<value>268435456</value>
-	</property>
-	<!-- 最大storefile大小,超过这个大小,hbase将开始合并storefile,而存储这个storefile的region将被切割,默认是10G -->
-	<property>
-		<name>hbase.hregion.max.filesize</name>
-		<value>10737418240</value>
-	</property>
-	<!-- region中所有storefile的major compactions时间间隔,默认1天,0表示禁用这个功能 -->
-	<property>
-		<name>hbase.hregion.majorcompaction</name>
-		<value>0</value>
-	</property>
-
-4.启动hbase
-
->
-	进入hbase/bin下,./start-hbase.sh,会显示启动了zk,master,regionserver.
-	jps显示HMaster,HRegionServer,HQuorumPeer
-
-5.进入到hbase的命令行:hbase/bin:./hbase shell,进入控制台后,执行status,会显示当前hbase的状态
+* 进入到hbase的命令行:./hbase shell,进入控制台后,执行status,会显示当前hbase的状态
 
 
 
