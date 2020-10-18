@@ -66,19 +66,93 @@
 
 # 核心
 
-* NameNode:存储文件的元数据,如文件名,文件目录结构,文件属性,以及每个文件的块列表和块所在的datanode等.默认情况下,只有1个namenode,3个datanode
-* DataNode:数据节点,在本地文件系统存储文件块数据,以及块数据的校验
-* Secondary NameNode:监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
-* ResourceManager(rm):资源管理
+* HDFS是一个主从(Master/Slave)结构框架,由一个NameNode和多个DataNode构成
+* 存储模型:
+  * 文件线性按字节切割成块(block),具有offset,id
+  * 文件与文件的block大小可以不一样
+  * 一个文件除最后一个block,其他block大小一致
+  * block的大小依据硬件的IO特性调整,如果性能好就可以加大该值
+  * block被分散存放在集群的节点汇总,具有location
+  * block具有副本(replication),没有主从概念,副本不能出现在同一个节点,是满足可靠性和性能的关键
+  * 文件上传可以指定block大小和副本数,上传后只能修改副本数
+  * 一次写入多次读取,不支持修改,因为修改会改变block的大小,进而改变offset,这需要消耗大量的计算机资源
+  * 支持追加数据,只能在block末尾追加
+  * hdfs删除时只能删除文件,不能删除block,和修改是同样的原因
+* Block的放置策略:
+  * 第一个副本:放置在上传文件的DN上.如果是集群外提交,则随机挑选一台磁盘不太满,cpu不太忙的节点
+  * 第二个副本:放置在于第一个副本不同的机架节点上
+  * 第三个副本:与第二个副本相同机架的节点
+  * 更多副本:随机节点
+* NameNode(NN):文件元数据节点
+  * 存储文件元数据,包括文件名,目录结构,属性,以及每个文件的block列表和block所在的datanode
+  * 完全基于内存运行
+  * 需要持久化方案保证数据可靠性
+  * 提供副本放置策略
+* 元数据持久化
+  * 任何对文件爱你系统元数据产生修改的操作,NameNode都会使用一种称为EditLog的事务日志记录下来
+  * 使用FsImage存储内存所有的元数据状态
+  * 使用本地磁盘保存EditLog和FsImage
+  * EditLog具有完整性,数据丢失少,但恢复速度慢,并有体积膨胀风险
+  * FsImage具有恢复速度快,体积与内存数据相当,但不能实时保存,数据丢失多
+  * NN使用了FsImage+EdieLog整合的方案:滚动将增量的EditLog更新到FsImage,保证更近实时的FsImage和更小的EditLog体积
+* 安全模式
+  * HDFS搭建时会先格式化,此时会产生一个空的FsImage
+  * 当NN启动时,它从硬盘中读取EditLog和FsImage
+  * 将所有EditLog中是事务作用在内存中的FsImage中,并将新的FsImage从内存中保存到本地磁盘
+  * 删除旧的EditLog,因为这个旧的EditLog已经作用在FsImage上了
+  * NN启动后会进入安全模式状态,该状态下不进行数据块的复制,而是接收DN的心跳和块状态报告
+  * 每当NN检测确认某个数据块的副本数目达到必须的最小值,则该数据块就会被认为是副本安全的
+  * 在一定百分比(可配置)的数据块被NN检测确认是安全后(再加一个额外的30S等待),NN将退出安全模式状态
+  * 接下来NN会确定还有哪些数据块的副本没有达到指定数目,并将这些数据库块制到其他DN上
+* DataNode(DN):数据节点
+  * 在本地文件系统存储文件块数据(block),以及提供块数据的校验,读写
+  * DataNode和NameNode维持心跳,并汇报自己持有的block信息
+* 客户端和NameNode交互文件的元数据,和DataNode交互文件爱你block信息
+* Secondary NameNode(SNN):监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
+  * 在非HA模式下,SNN一般是独立的节点,周期完成对NN的EditLog向FsImage合并,减少EditLog大小
+  * 根据配置文件爱你设置的时间间隔:fs.checkpoint.period,默认3600S
+  * 根据配置文件设置edits log大小:fs.checkpoint.size,规定edits文件的最大值默认是64M
+* ResourceManager(rm):资源管理,一个集群只有一个RM是活动状态
   * 处理客户端请求
   * 监控NodeManager
-  * 启动和监控ApplicationMaster,NodeManager
+  * 启动和监控ApplicationMaster
   * 资源分配与调度
-* NodeManager(nm):节点管理
-  * 单个节点上的资源管理
+* NodeManager(nm):节点管理,集群中有N个,负责单个节点的资源管理和使用以及task运行状况
+  * 单个节点上的资源管理和任务管理
   * 处理来自ResourceManager和ApplicationMaster的命令
-* ApplicationMaster:数据切分,为应用程序申请资源,并分配给内部任务,任务监控和容错
+  * 定期向RM汇报本节点的资源使用请求和各个Container的运行状态
+* ApplicationMaster:每个应用/作业对应一个,并分配给内部任务
+  * 数据切分
+  * 为应用程序向RM申请资源(Container),并分配给内部任务
+  * 与NM通信以启动或停止task,task是运行在Container中的
+  * task任务监控和容错
 * Container:对任务运行环境的抽象,封装了CPU,内存等多维资源以及环境变量,启动命令等任务信息
+* YARN执行流程
+  * 用户向YRAN提交作业
+  * RM为该作业分配第一个Container(AM)
+  * RM会与对应的NM通信,要求NM在这个Container上启动应用程序的AM
+  * AM首先向RM注册,然后AM将为各个任务申请资源,并监控运行情况
+  * AM采用轮询的方式通过RPC协议向RM申请和领取资源
+  * AM申请到资源后,便和对应的NM通信,要求NM启动任务
+  * NM启动作业对应的task
+* HDFS写流程
+  * Client和NN连接创建文件元数据,连接后NN判定元数据是否有效
+  * NN触发副本放置策略,返回一个有序的DN列表
+  * Client和DN建立Pipeline连接
+  * Client将块切分成packet(64KB),并使用chunk(512B)+chucksum(4B)填充
+  * Client将packet放入发送列队dataqueue中,并向第一个DN发送
+  * 第一个DN接收packet后本地保存并发给第二个DN,第二个DN接收packet后本地保存并发给第三个DN
+  * 这个过程中,上游节点同时发送下一个packet,HDFS使用这种传输方式,副本数对于Client是透明的
+  * 当block传输完成,DN各自向NN汇报,同时Client继续传输下一个block
+  * 所以,Client的传输和block的汇报也是并行的
+* HDFS读流程
+  * 为降低整体带宽消耗和读取延迟,HDFS会进来让读取程序取离它最近的副本
+  * 如果在读取程序的同一个机架上有一个副本,那么就读取该副本
+  * 如果一个HDFS集群跨越多个数据中心,那么客户端也将首先读本地数据中心的副本
+  * 如下载一个文件
+    * Client和NN交互文件元数据获取fileBlockLocation
+    * NN会按距离策略排序返回
+    * Client尝试下载block并校验数据完整性
 
 
 

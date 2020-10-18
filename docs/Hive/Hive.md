@@ -38,3 +38,51 @@
 * string:对应java的string
 * timestamp:时间戳
 * binary:字节数组
+
+
+
+# 安装
+
+* 下载安装包,解压到/app/hive
+
+* 配置Hive环境变量
+
+  ```shell
+  export HIVE_HOME =/app/hive
+  export PATH=$PATH:$HIVE_HOME/bin
+  ```
+
+* 修改hive/conf目录下的hive-env.sh.template为hive-env.sh
+
+* 在hive-env.conf加入hadoop环境地址
+
+  ```shell
+  HADOOP_HOME=/app/hadoop # 根据自己的来
+  ```
+
+* 安装一个mysql,略
+
+* 配置mysql的地址,在hive-site.xml中
+
+  ```xml
+  <configuration>
+  <property>
+  	<name>java.jdo.option.ConnnectionURL</name>
+  	<value>jdbc:mysql://localhost:3306/hive?createDatabaseIfNotExists=true</value>
+  </property>
+  <property>
+  	<name>java.jdo.option.ConnnectionDriverName</name>
+  	<value>com.mysql.jdbc.Driver</value>
+  </property>
+  <property>
+  	<name>java.jdo.option.ConnnectionUserName</name>
+  	<value>http://192.168.1.146:50090</value>
+  </property>
+  <property>
+  	<name>java.jdo.option.ConnnectionPassword</name>
+  	<value>123456</value>
+  </property>
+  </configuration>
+  ```
+
+  
