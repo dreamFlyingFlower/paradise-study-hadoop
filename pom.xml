@@ -7,5 +7,6 @@
   
   <modules>
   	<module>paradise-study-hbase</module>
+  	<module>paradise-study-hdfs</module>
   </modules>
 </project>

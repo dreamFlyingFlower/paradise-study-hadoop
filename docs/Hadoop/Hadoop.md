@@ -67,104 +67,284 @@
 # 核心
 
 * HDFS是一个主从(Master/Slave)结构框架,由一个NameNode和多个DataNode构成
-* 存储模型:
-  * 文件线性按字节切割成块(block),具有offset,id
-  * 文件与文件的block大小可以不一样
-  * 一个文件除最后一个block,其他block大小一致
-  * block的大小依据硬件的IO特性调整,如果性能好就可以加大该值
-  * block被分散存放在集群的节点汇总,具有location
-  * block具有副本(replication),没有主从概念,副本不能出现在同一个节点,是满足可靠性和性能的关键
-  * 文件上传可以指定block大小和副本数,上传后只能修改副本数
-  * 一次写入多次读取,不支持修改,因为修改会改变block的大小,进而改变offset,这需要消耗大量的计算机资源
-  * 支持追加数据,只能在block末尾追加
-  * hdfs删除时只能删除文件,不能删除block,和修改是同样的原因
-* Block的放置策略:
-  * 第一个副本:放置在上传文件的DN上.如果是集群外提交,则随机挑选一台磁盘不太满,cpu不太忙的节点
-  * 第二个副本:放置在于第一个副本不同的机架节点上
-  * 第三个副本:与第二个副本相同机架的节点
-  * 更多副本:随机节点
-* NameNode(NN):文件元数据节点
-  * 存储文件元数据,包括文件名,目录结构,属性,以及每个文件的block列表和block所在的datanode
-  * 完全基于内存运行
-  * 需要持久化方案保证数据可靠性
-  * 提供副本放置策略
+
+
+
+## 存储模型
+
+* 文件线性按字节切割成块(block),具有offset,id
+* 文件与文件的block大小可以不一样
+* 一个文件除最后一个block,其他block大小一致
+* block的大小依据硬件的IO特性调整,如果性能好就可以加大该值
+* block被分散存放在集群的节点汇总,具有location
+* block具有副本(replication),没有主从概念,副本不能出现在同一个节点,是满足可靠性和性能的关键
+* 文件上传可以指定block大小和副本数,上传后只能修改副本数
+* 一次写入多次读取,不支持修改,因为修改会改变block的大小,进而改变offset,这需要消耗大量的计算机资源
+* 支持追加数据,只能在block末尾追加
+* hdfs删除时只能删除文件,不能删除block,和修改是同样的原因
+
+
+
+## Block的放置策略
+
+* 第一个副本:放置在上传文件的DN上.如果是集群外提交,则随机挑选一台磁盘不太满,cpu不太忙的节点
+* 第二个副本:放置在于第一个副本不同的机架节点上
+* 第三个副本:与第二个副本相同机架的节点
+* 更多副本:随机节点
+
+
+
+## NameNode(NN)
+
+* 文件元数据节点
+* 存储文件元数据,包括文件名,目录结构,属性,以及每个文件的block列表和block所在的datanode
+* 完全基于内存运行
+* 需要持久化方案保证数据可靠性
+* 提供副本放置策略
+
 * 元数据持久化
-  * 任何对文件爱你系统元数据产生修改的操作,NameNode都会使用一种称为EditLog的事务日志记录下来
+  * 任何对文件系统元数据产生修改的操作,NN都会使用一种称为EditLog的事务日志记录下来
   * 使用FsImage存储内存所有的元数据状态
   * 使用本地磁盘保存EditLog和FsImage
   * EditLog具有完整性,数据丢失少,但恢复速度慢,并有体积膨胀风险
   * FsImage具有恢复速度快,体积与内存数据相当,但不能实时保存,数据丢失多
   * NN使用了FsImage+EdieLog整合的方案:滚动将增量的EditLog更新到FsImage,保证更近实时的FsImage和更小的EditLog体积
-* 安全模式
-  * HDFS搭建时会先格式化,此时会产生一个空的FsImage
-  * 当NN启动时,它从硬盘中读取EditLog和FsImage
-  * 将所有EditLog中是事务作用在内存中的FsImage中,并将新的FsImage从内存中保存到本地磁盘
-  * 删除旧的EditLog,因为这个旧的EditLog已经作用在FsImage上了
-  * NN启动后会进入安全模式状态,该状态下不进行数据块的复制,而是接收DN的心跳和块状态报告
-  * 每当NN检测确认某个数据块的副本数目达到必须的最小值,则该数据块就会被认为是副本安全的
-  * 在一定百分比(可配置)的数据块被NN检测确认是安全后(再加一个额外的30S等待),NN将退出安全模式状态
-  * 接下来NN会确定还有哪些数据块的副本没有达到指定数目,并将这些数据库块制到其他DN上
-* DataNode(DN):数据节点
-  * 在本地文件系统存储文件块数据(block),以及提供块数据的校验,读写
-  * DataNode和NameNode维持心跳,并汇报自己持有的block信息
+
+
+
+### NN故障处理
+
+#### 第一种
+
+* 将SNN中数据拷贝到NN存储的目录
+  * kill -9 NN进程
+  * 删除NN存储的数据
+  * 拷贝SNN中数据到原NN存储数据目录
+  * 重启NN
+
+#### 第二种
+
+* 使用-importCheckpoint选项启动NN守护进程,从而将SNN中数据拷贝到NN目录中
+
+  * 修改hdfs-site.xml,减少checkpoint的时间,指定nn目录
+
+    ```xml
+    <property>
+    	<!-- 减少SNN检查的时间 -->
+    	<name>dfs.namenode.checkpoint.period</name>
+    	<value>120</value>
+    </property>
+    <property>
+    	<!-- 指定nn目录 -->
+    	<name>dfs.namenode.name.dir</name>
+    	<value>/app/hadoop/data/tmp/dfs/name</value>
+    </property>
+    ```
+
+  * kill -9 NN进程
+
+  * 删除NN存储的数据:rm -rf /app/hadoop/data/tmp/dfs/name/*
+
+  * 若SNN不和NN在一个节点上,需要将SNN存储数据的目录拷贝到NN存储数据的同级目录,并删除in_use.lock文件
+
+  * 导入检查点数据,等待一会再用ctrl+c结束掉
+
+  * 重启NN
+
+
+
+### NN多目录配置
+
+* 在hdfs-site.xml中添加如下内容
+
+  ```xml
+  <property>
+  <name>dfs.namenode.name.dir</name>
+  <value>file:///${hadoop.tmp.dir}/dfs/name1,file:///${hadoop.tmp.dir}/dfs/name2</value>
+  </property>
+  ```
+
+* 停止集群,删除data和logs目录所有数据
+
+* 格式化集群并重启
+
+
+
+## 安全模式
+
+* HDFS搭建时会先格式化,此时会产生一个空的FsImage
+* 当NN启动时,它从硬盘中读取EditLog和FsImage
+* 将所有EditLog中是事务作用在内存中的FsImage中,并将新的FsImage从内存中保存到本地磁盘
+* 删除旧的EditLog,因为这个旧的EditLog已经作用在FsImage上了
+* NN启动后会进入安全模式状态,该状态下不进行数据块的复制,而是接收DN的心跳和块状态报告
+* 每当NN检测确认某个数据块的副本数目达到必须的最小值,则该数据块就会被认为是副本安全的
+* 最小副本条件指整个文件系统中99.9%的块满足最小副本级别(dfs.replication=1)
+* 在一定百分比(可配置)的数据块被NN检测确认是安全后(再加一个额外的30S等待),NN将退出安全模式状态
+* 接下来NN会确定还有哪些数据块的副本没有达到指定数目,并将这些数据库块制到其他DN上
+* 相关命令:
+  * hdfs dfsadmin -safemode get:查看安全模式状态
+  * hdfs dfsadmin -safemode enter:进入安全模式状态
+  * hdfs dfsadmin -safemode leave:离开安全模式状态
+  * hdfs dfsadmin -safemode wait:等到安全模式状态
+
+
+
+## DataNode(DN)
+
+* 数据节点,在本地文件系统存储文件块数据(block),以及提供块数据的校验,读写
+* DataNode和NameNode维持心跳,并汇报自己持有的block信息
+
 * 客户端和NameNode交互文件的元数据,和DataNode交互文件爱你block信息
-* Secondary NameNode(SNN):监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
-  * 在非HA模式下,SNN一般是独立的节点,周期完成对NN的EditLog向FsImage合并,减少EditLog大小
-  * 根据配置文件爱你设置的时间间隔:fs.checkpoint.period,默认3600S
-  * 根据配置文件设置edits log大小:fs.checkpoint.size,规定edits文件的最大值默认是64M
-* ResourceManager(rm):资源管理,一个集群只有一个RM是活动状态
-  * 处理客户端请求
-  * 监控NodeManager
-  * 启动和监控ApplicationMaster
-  * 资源分配与调度
-* NodeManager(nm):节点管理,集群中有N个,负责单个节点的资源管理和使用以及task运行状况
-  * 单个节点上的资源管理和任务管理
-  * 处理来自ResourceManager和ApplicationMaster的命令
-  * 定期向RM汇报本节点的资源使用请求和各个Container的运行状态
-* ApplicationMaster:每个应用/作业对应一个,并分配给内部任务
-  * 数据切分
-  * 为应用程序向RM申请资源(Container),并分配给内部任务
-  * 与NM通信以启动或停止task,task是运行在Container中的
-  * task任务监控和容错
-* Container:对任务运行环境的抽象,封装了CPU,内存等多维资源以及环境变量,启动命令等任务信息
-* YARN执行流程
-  * 用户向YRAN提交作业
-  * RM为该作业分配第一个Container(AM)
-  * RM会与对应的NM通信,要求NM在这个Container上启动应用程序的AM
-  * AM首先向RM注册,然后AM将为各个任务申请资源,并监控运行情况
-  * AM采用轮询的方式通过RPC协议向RM申请和领取资源
-  * AM申请到资源后,便和对应的NM通信,要求NM启动任务
-  * NM启动作业对应的task
-* HDFS写流程
-  * Client和NN连接创建文件元数据,连接后NN判定元数据是否有效
-  * NN触发副本放置策略,返回一个有序的DN列表
-  * Client和DN建立Pipeline连接
-  * Client将块切分成packet(64KB),并使用chunk(512B)+chucksum(4B)填充
-  * Client将packet放入发送列队dataqueue中,并向第一个DN发送
-  * 第一个DN接收packet后本地保存并发给第二个DN,第二个DN接收packet后本地保存并发给第三个DN
-  * 这个过程中,上游节点同时发送下一个packet,HDFS使用这种传输方式,副本数对于Client是透明的
-  * 当block传输完成,DN各自向NN汇报,同时Client继续传输下一个block
-  * 所以,Client的传输和block的汇报也是并行的
-* HDFS读流程
-  * 为降低整体带宽消耗和读取延迟,HDFS会进来让读取程序取离它最近的副本
-  * 如果在读取程序的同一个机架上有一个副本,那么就读取该副本
-  * 如果一个HDFS集群跨越多个数据中心,那么客户端也将首先读本地数据中心的副本
-  * 如下载一个文件
-    * Client和NN交互文件元数据获取fileBlockLocation
-    * NN会按距离策略排序返回
-    * Client尝试下载block并校验数据完整性
+
+
+
+### DN数据完整性
+
+* 当DN读取Block数据时,会计算CheckSum
+* 若计算后的CheckSum与Block创建时不一样,说明Block已经损坏
+* Client读取其他DN上的Block
+* DN在其文件创建后周期验证CheckSum
+
+
+
+### DN心跳
+
+* DN进程死亡或网络故障造成DN无法与NN通信,NN不会立即将该节点判定为离线,要经过一段时间,这段时间称为超时时长
+
+* HDFS默认的超时时长为10分钟+30秒
+
+* 若定义超时时间为TimeOut,则超时时长计算公式如下
+  $$
+  TimeOut=2*dfs.namenode.heartbeat.recheck-interval+10*dfs.heartbeat.interval
+  $$
+
+* 默认的dfs.namenode.heartbeat.recheck-interval为5分钟,dfs.heartbeat.interval默认为3秒
+
+
+
+### DN多目录
+
+* DN可以配置多个目录,每个目录存储的数据不一样,即数据不是副本
+
+  ```xml
+  <property>
+  <name>dfs.datanode.data.dir</name>
+  <value>file:///${hadoop.tmp.dir}/dfs/data1,file:///${hadoop.tmp.dir}/dfs/data2</value>
+  </property>
+  ```
+
+* 删除data和logs,重启DN
+
+
+
+## Secondary NameNode(SNN)
+
+* 监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
+
+* 在非HA模式下,SNN是独立的节点,周期完成对NN的EditLog向FsImage合并,减少EditLog大小
+* 根据配置文件设置的时间间隔:fs.checkpoint.period,默认3600S
+* 根据配置文件设置edits log大小:fs.checkpoint.size,规定edits文件的最大值默认是64M
+
+
+
+## ResourceManager(rm)
+
+* 资源管理,一个集群只有一个RM是活动状态
+
+* 处理客户端请求
+* 监控NodeManager
+* 启动和监控ApplicationMaster
+* 资源分配与调度
+
+
+
+## NodeManager(nm)
+
+* 节点管理,集群中有N个,负责单个节点的资源管理和使用以及task运行状况
+
+* 单个节点上的资源管理和任务管理
+* 处理来自ResourceManager和ApplicationMaster的命令
+* 定期向RM汇报本节点的资源使用请求和各个Container的运行状态
+
+
+
+## ApplicationMaster
+
+* 每个应用/作业对应一个,并分配给内部任务
+
+* 数据切分
+* 为应用程序向RM申请资源(Container),并分配给内部任务
+* 与NM通信以启动或停止task,task是运行在Container中的
+* task任务监控和容错
+
+
+
+## Container
+
+* 对任务运行环境的抽象,封装了CPU,内存等多维资源以及环境变量,启动命令等任务信息
+
+
+
+## YARN执行流程
+
+* 用户向YRAN提交作业
+* RM为该作业分配第一个Container(AM)
+* RM会与对应的NM通信,要求NM在这个Container上启动应用程序的AM
+* AM首先向RM注册,然后AM将为各个任务申请资源,并监控运行情况
+* AM采用轮询的方式通过RPC协议向RM申请和领取资源
+* AM申请到资源后,便和对应的NM通信,要求NM启动任务
+* NM启动作业对应的task
+
+
+
+## HDFS写流程
+
+* Client和NN连接创建文件元数据,连接后NN判定元数据是否有效
+* NN触发副本放置策略,返回一个有序的DN列表
+* Client和DN建立Pipeline连接
+* Client将块切分成packet(64KB),并使用chunk(512B)+chucksum(4B)填充
+* Client将packet放入发送列队dataqueue中,并向第一个DN发送
+* 第一个DN接收packet后本地保存并发给第二个DN,第二个DN接收packet后本地保存并发给第三个DN
+* 这个过程中,上游节点同时发送下一个packet,HDFS使用这种传输方式,副本数对于Client是透明的
+* 当block传输完成,DN各自向NN汇报,同时Client继续传输下一个block
+* 所以,Client的传输和block的汇报也是并行的
+
+
+
+## HDFS读流程
+
+* 为降低整体带宽消耗和读取延迟,HDFS会进来让读取程序取离它最近的副本
+* 如果在读取程序的同一个机架上有一个副本,那么就读取该副本
+* 如果一个HDFS集群跨越多个数据中心,那么客户端也将首先读本地数据中心的副本
+* 如下载一个文件
+  * Client和NN交互文件元数据获取fileBlockLocation
+  * NN会按距离策略排序返回
+  * Client尝试下载block并校验数据完整性
 
 
 
 # API
 
+* hadoop fs:查看hadoop的命令,大部分和linux类似,但是都是以hadoop fs开头
+
 * hadoop checknative -a:检查hadoop本地库是否正常,false不正常
-* hadoop fs -put file/folder /file:上传linux里的file或folder到hadoop的/file,file可自定义;若是/file存在,则删除hadoop fs -rm -r /file,提示deleted file才表示删除成功
-* hadoop fs -rm -r /file:删除hadoop集群中的文件或目录
-* hadoop fs -ls /file:查看上传的文件是否成功,成功会列出文件地址,否则报错文件不存在
+
+* hadoop fs [] 
+
+  * -ls /file:查看上传的文件是否成功,成功会列出文件地址,否则报错文件不存在
+
+  * -moveFromLocal src des:将本地文件上传到hdfs中,同时会删除本地文件
+  * -appendToFile src des:将本地文件的内容追加到hdfs中某个文件中,本地文件不变
+  * -put/-copyFromLocal src des:将本地文件上传到hdfs中,本地文件不删除.若是/des存在,则删除hadoop fs -rm -r /des,提示deleted des才表示删除成功
+  * -get/-copyToLocal src des:将hdfs从的文件拷贝到本地目录,hdfs中的文件不删除
+  * -cp/-mv/-tail src des:类似linux的cp/mv/tail,只能在hdfs中拷贝和使用
+  * -getmerge folder file:将hdfs中的多个文件合并下载到本地
+  * -cat /file:查看hadoop中某个文件的内容
+  * -rm -r /file:删除hadoop集群中的文件或目录
+
 * hadoop jar XXX.jar xx.xx.xxx.TestMain /input /output:运行jar包,需要指定main所在类,/input表示上传文件所在地址,/output表示文件输出地址,且该地址不能是已经存在的
-* hadoop fs -ls /output:查看运行生成的文件,若有success文件代表成功,可以从50070的utilities的browse the file system下面查看,可将最后的结果下载下来查看
-* hadoop fs -cat /file:查看hadoop中某个文件的内容
+
+* hadoop distcp hdfs://hadoop001:9000/file1 hdfs://hadoop002:9000/file2:hadoop2.0才有该命令,可以实现直接将hdfs中的file1复制到hdfs的file2中,而且是递归复制
 
 
 
@@ -207,7 +387,7 @@
 
 7. 修改自己的ip地址为静态地址,修改主机名
 
-8. 修改/etc/hosts,配置集群其他主机的ip以及主机名,在伪分布式模式下可不配,真集群需要配置
+8. 修改/etc/hosts,配置集群其他主机的ip以及主机名,在伪分布式模式下可不配,集群需要配置
 
 9. 修改hadoop配置文件,所需配置文件都在/app/hadoop/hadoop-2.9.1/etc/hadoop文件夹下
 
@@ -345,3 +525,111 @@
     1. mr-jobhistory-daemon.sh start|stop historyserver:启动/停止历史服务器
     2. yarn-daemon.sh start|stop resourcemanager:启动/停止总资源管理器
     3. yarn-daemon.sh start|stop nodemanager:启动/停止节点管理器
+
+
+
+# 集群
+
+* 集群与伪分布式的步骤相同,集群中的每台机器都要配置JDK,Hadoop环境
+
+* 关闭所有集群的防火墙,或者根据需求关闭防火墙
+
+* 都要设置静态ip,hostname和/etc/hosts,在所有的配置文件中尽量使用主机名访问
+
+* 伪分布式下slaves文件可以不写,但是集群模式下每台机器的主机名都要写到该文件中,包括本地的也要写入,即集群中每台服务器的slaves都应该是一样的
+
+* 都要配置免密登录
+
+* 需要进行时间同步
+
+  * 安装ntpd服务,该服务需要从网上下载安装包才能安装
+
+  * 开启启动:chkconfig ntpd on
+
+  * 启动定时任务
+
+    ```shell
+    crontab -e
+    */10 * * * /usr/sbin/ntpdate hadoop001 # hadoop001是作为时间服务器的主机名
+    ```
+
+  * 修改时间服务器上的/etc/ntp.conf
+
+    ```shell
+    # 授权指定网段上的所有机器可以从本机器上查询和同步时间
+    restrict 192.168.1.0 mask 255.255.255.0 nomodify notarp
+    # 修改使得禁区在局域网中,不使用其他互联网上的时间,将其注释掉
+    #server 0.centos.pool.ntp.org iburst
+    #server 1.centos.pool.ntp.org iburst
+    #server 2.centos.pool.ntp.org iburst
+    #server 3.centos.pool.ntp.org iburst
+    ```
+
+  * 让硬件时间和系统时间同步
+
+    ```SHELL
+    vi /etc/sysconfig/ntpd
+    # 增加如下代码
+    SYNC_HWCLOCK=yes
+    ```
+
+  * 设置开机启动:chkconfig ntpd on
+
+
+
+# DN新增
+
+* 复制已有的DN,修改IP和主机名
+* 删除原来DN的HDFS文件系统留下的data和logs目录
+* source一下配置文件,之后直接启动DN:hadoop-daemon.sh start datanode
+* 也可以重新配置一台机器,但太费事
+
+
+
+# 白名单
+
+* 添加白名单,可以控制那些主机能访问NN,那些主机不能访问NN
+
+* 在/app/hadoop/etc/hadoop下新增一个dfs.hosts文件,该文件中添加可以访问集群的主机名
+
+* 在所有节点的hdfs-site.xml中添加如下配置,使白名单生效
+
+  ```xml
+  <property>
+  	<name>dfs.hosts</name>
+  	<value>/app/hadoop/etc/hadoop/dfs.hosts</value>
+  </property>
+  ```
+
+* 刷新NN和RM
+
+  ```shell
+  hdfs dfsadmin -refreshNodes
+  yarn rmadmin -refreshNodes
+  ```
+
+* ./start-balancer.sh:集群的再平衡,保证DN失效后数据能重新分布
+
+
+
+# 黑名单
+
+* 在黑名单上的主机会被强制退出,黑名单和白名单上的主机不能重复
+
+* 在NN的hadoop下创建dfs.hosts.exclude文件,添加要上黑名单的主机名
+
+* 在NN的hdfs-site.xml中增加dfs.hosts.exclude属性
+
+  ```xml
+  <property>
+  	<name>dfs.hosts.exclude</name>
+  	<value>/app/hadoop/etc/hadoop/dfs.hosts.exclude</value>
+  </property>
+  ```
+
+* 刷新NN和RM
+
+  ```shell
+  hdfs dfsadmin -refreshNodes
+  yarn rmadmin -refreshNodes
+  ```
