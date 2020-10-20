@@ -159,3 +159,18 @@
 
 
 
+* 在Spark中运行Scala项目,将打包好的Scala的jar包放到指定目录中,如/app/spark/jars
+
+* spark-submit --class jar包中main方法的路径 --master local[2] hadoop的jar包路径 需要被解析的文件路径
+
+  ```shell
+  spark-submit --class com.wy.SQLContextApp --master local[2] /app/hadoop/lib/sql-1.0.jar /app/spark/data.json
+  ```
+
+* 在Spark中运行Hive源代码,需要额外添加数据库的jar包路径
+
+  ```shell
+  spark-submit --class com.wy.HiveContextApp --master local[2] --jars /app/common/jars/mysql-connector-java-5.1.7-bin.jar /app/hadoop/lib/sql-1.0.jar
+  ```
+
+  
