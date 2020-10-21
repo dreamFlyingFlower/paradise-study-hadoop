@@ -14,12 +14,12 @@ import java.util.Map;
  * @date 2020年2月12日 下午1:57:25
  */
 public class MimeUtil {
+
 	private static Map<String, String> mimeMap = new HashMap<>();
 
 	static {
-		try {
-			InputStream inputStream = MimeUtil.class.getResourceAsStream("/mime.types");
-			BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+		try (InputStream inputStream = MimeUtil.class.getResourceAsStream("/mime.types");
+				BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));) {
 			String line = null;
 			while ((line = reader.readLine()) != null) {
 				String[] ss = line.split("\\s+", 2);
