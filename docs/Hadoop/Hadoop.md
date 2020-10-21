@@ -29,24 +29,6 @@
 
 
 
-# MapReduce
-
-* 是一个分布式运算程序的编程框架,核心功能是将用户编写的业务逻辑代码和自带默认组件整合成一个完整的分布式运算程序,并发运行在一个hadoop集群上
-* MR易于编程,简单的实现一些接口就可以完成一个分布式程序
-* 良好的扩展性
-* 高容错性,即使集群中的一台机器挂掉了,它可以把上面的计算任务转移到另外一个节点上运行
-* 适合PB级别以上海量数据的离线处理
-* MR不适合做实时计算,流式计算,DAG(有向图)计算
-  * 实时计算:因为MR是读取磁盘上的文件,做处理比较慢
-  * 流式计算:流式计算的输入数据是动态的,而MR的输入数据是静态的,这取决于MR的设计特点
-  * DAG:多个应用程序存在依赖关系,后一个应用程序的输入为前一个的输出.在这种情况下,MR作业的结果会写入到磁盘中,会产生大量的磁盘IO,导致性能很低
-* MR的工作流程:
-  * 将文件中的内容按行读取,之后按照空格进行切分
-  * 再开辟空间进行分区排序,排序按字典排序,将结果放在一个类似map的集合中
-  * 排序之后再将相同的项进行合并
-
-
-
 # 生态
 
 * HDFS:解决存储问题
@@ -297,7 +279,123 @@
 
 
 
-## HDFS写流程
+# MapReduce
+
+是一个分布式运算程序的编程框架,核心功能是将用户编写的业务逻辑代码和自带默认组件整合成一个完整的分布式运算程序,并发运行在一个hadoop集群上
+
+
+
+## 优点
+
+* MR易于编程,简单的实现一些接口就可以完成一个分布式程序
+* 良好的扩展性,可以通过增加机器来增加程序的计算能力
+* 高容错性,即使集群中的一台机器挂掉了,它可以把上面的计算任务转移到另外一个节点上运行
+* 适合PB级别以上海量数据的离线处理
+
+
+
+## 缺点
+
+* MR不适合做实时计算,流式计算,DAG(有向图)计算
+* 实时计算:因为MR是读取磁盘上的文件,做处理比较慢
+* 流式计算:流式计算的输入数据是动态的,而MR的输入数据是静态的,这取决于MR的设计特点
+* DAG:多个应用程序存在依赖关系,后一个应用程序的输入为前一个的输出.在这种情况下,MR作业的结果会写入到磁盘中,会产生大量的磁盘IO,导致性能很低
+
+
+
+## 流程
+
+* 分为Map和Reduce阶段,M安排阶段的并发MapTask,完全并行运行,互不干涉
+* Reduce阶段并发ReduceTask,互不干涉,数据都依赖于Map阶段的MapTask输出的实例
+* MR只能包含一个Map阶段和一个Reduce阶段,如果逻辑很复杂,只能多个MR串行运行
+* 将文件中的内容按行读取,之后按照空格进行切分
+* 再开辟空间进行分区排序,排序按字典排序,将结果放在一个类似map的集合中
+* 排序之后再将相同的项进行合并
+
+
+
+## 核心
+
+* MrAppMaster:负责整个程序的过程调度及状态协调
+* MapTask:负责Map阶段的整个数据处理流程
+* ReduceTask:负责Reduce阶段的整个数据处理流程
+
+
+
+## 编程规范
+
+
+
+### Mapper阶段
+
+1. 用户自定义的Mapper要继承自己的父类
+2. Mapper的输入数据是KV对的形式
+3. Mapper中的业务逻辑卸载map()方法中
+4. Mapper的输出数据是KV对的形式
+5. map()方法(MapTask进程)对每一KV对调用一次
+
+
+
+### Reducer阶段
+
+1. 用户自定义的Reducer要继承自己的父类
+2. Reducer的输入数据类型对应Mapper的输出数据类型,也是KV
+3. Reducer的业务逻辑卸载reduce()方法中
+4. ReduceTask进程对每一组相同k的KV组调用一次reduce()方法
+
+
+
+### Driver阶段
+
+1. 相当于YARN集群的客户端,用于提交整个程序到YARN集群,提交的是封装了MR程序相关运行参数的job对象
+2. 获取配置信息,获取job对象实例
+3. 指定本程序的jar包所在的本地路径
+4. 关联Mapper/Reducer业务类
+5. 指定Mapper输出数据的kv类型
+6. 指定最终输出的数据的kv类型
+7. 指定kv的输入原始文件所在目录
+8. 指定job的输出结果多在目录
+9. 提交作业
+
+
+
+## 序列化
+
+* Hadoop自带的序列化(Writable),不使用Java的序列化(比较重量级)
+* 紧凑:高效使用存储空间
+* 快速:读写数据的额外开销小
+* 可扩展:随着通信协议的升级和升级
+* 互操作:支持多语言的交互
+
+
+
+### 实现序列化
+
+1. 必须实现Writable接口
+2. 反序列化时,需要反射调用空参构造函数,所以必须有空参构造
+3. 重写序列化方法
+4. 重写反序列化方法
+5. 注意反序列化的顺序和序列化的顺序完全一致
+6. 要想把结果显示在文件中,需要重写toString(),可用”\t”分开,方便后续用
+7. 如果需要将自定义的bean放在key中传输,则还需要实现Comparable接口,因为MapReduce框中的Shuffle过程要求对key必须能排序
+
+
+
+## MapTask并行度
+
+* 数据切片:数据切片只是在逻辑上对输入进行分片,并不会在磁盘上将其切分成片进行存储
+* 一个job的Map阶段并行度由客户端在提交job时的切片数决定
+* 每个Split切片分配一个MapTask并行实例处理
+* 默认情况下,切片大小等于Block大小
+* 切片时不考虑数据集整体,而是逐个针对每个文件单独切片
+
+
+
+# HDFS
+
+
+
+## 写流程
 
 * Client和NN连接创建文件元数据,连接后NN判定元数据是否有效
 * NN触发副本放置策略,返回一个有序的DN列表
@@ -311,7 +409,7 @@
 
 
 
-## HDFS读流程
+## 读流程
 
 * 为降低整体带宽消耗和读取延迟,HDFS会进来让读取程序取离它最近的副本
 * 如果在读取程序的同一个机架上有一个副本,那么就读取该副本
@@ -320,6 +418,88 @@
   * Client和NN交互文件元数据获取fileBlockLocation
   * NN会按距离策略排序返回
   * Client尝试下载block并校验数据完整性
+
+
+
+## 2.X新特性
+
+### 集群间数据拷贝
+
+* distcp实现两个远程主机之间的文件复制,从src拷贝到des
+
+  ```shell
+  bin/hadoop distcp hdfs://hadoop001:9000/user/test1.txt hdfs://hadoop002:9000/user/test2.txt 
+  ```
+
+
+
+### 小文件存档
+
+* 每个文件均按块存储,每个块的元数据存储在NN的内存中,因此HDFS存储小文件会非常低效.因为大量的小文件会耗尽NN中的大部分内存,但是存储小文件所需要的磁盘容量和数据块的大小无关
+
+* 解决小文件存储的办法:HDFS归档文件或HAR文件
+
+  ```shell
+  # 归档文件,files.har为自定义归档名称,要带上har,归档src到des
+  bin/hadoop archive -archiveName files.har -p /hadoop/test/* /hadoop/archive
+  # 查看归档文件
+  hadoop fs -lsr /hadoop/archive/files.har
+  # 解归档文件
+  hadoop -fs -cp har:///hadoop/archive/files.har /hadoop/unarchive
+  ```
+
+
+
+### 回收站
+
+* 在core-site.xml中添加如下配置
+
+  ```xml
+  <!-- 0表示禁用回收站,其他值表示设置文件的存活时间,单位分钟 -->
+  <property>
+  	<name>fs.trash.interval</name>
+  	<value>1</value>
+  </property>
+  <!-- 检查回收站的时间间隔,如果为0,该值设置和fs.trash.interval值相同 -->
+  <property>
+  	<name>fs.trash.checkpoint.interval</name>
+  	<value>1</value>
+  </property>
+  <!-- 修改访问回收站的用户名,默认是dr.who -->
+  <property>
+  	<name>hadoop.http.staticuser.user</name>
+  	<value>hadoop</value>
+  </property>
+  ```
+
+* 查看回收站:/hadoop/hadoop/.Trash
+
+* 通过程序删除的文件不会经过回收站,需要调用moveToTrash()才进入回收站
+
+* 恢复回收站数据
+
+  ```shell
+  hadoop fs -mv /hadoop/hadoop/.Trash/Current/file /hadoop/hadoop/test
+  ```
+
+* 清空回收站
+
+  ```shell
+  hadoop fs -expunge
+  ```
+
+  
+
+### 快照管理
+
+* 快照相当于对目录做一个备份,并不会立即复制所有文件,当写入时才会产生新文件
+* hdfs dfsadmin -allowSnapshot path:开启指定目录的快照功能
+* hdfs dfsadmin -disallowSnapshot path:禁用指定目录的快照功能,默认是禁用
+* hdfs dfs -createSnapshot path [name]:对目录创建快照,默认是当前时间为名称
+* hdfs dfs -renameSnapshot path oldname newname:重命名快照
+* hdfs lsSnapshottableDir:列出当前用户所有可快照目录
+* hdfs snapshotDiff path1 path2:比较两个快照目录的不同之处
+* hdfs dfs -deleteSnapshot [path] [snapshotName]:删除快照,根据路径或名称
 
 
 
@@ -633,3 +813,4 @@
   hdfs dfsadmin -refreshNodes
   yarn rmadmin -refreshNodes
   ```
+
