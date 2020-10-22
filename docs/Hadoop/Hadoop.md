@@ -391,6 +391,102 @@
 
 
 
+## WritableComparable排序
+
+* 排序是MR框架中最重要的操作之一,MapTask和ReduceTask均会对数据(按照key)进行排序
+* 排序操作属于Hadoop的默认行为,任何应用程序中的数据均会被排序,不管逻辑上是否需要
+* 默认排序是按照字典顺序排序,且实际该排序方式是快速排序
+* MapTask(MT)
+  * 将处理的结果暂时放到一个缓冲区中
+  * 当缓冲区使用率达到一定阈值(80%)后,对缓冲区的数据进行一次快速排序,并将结果写到磁盘上
+  * 当数据处理完毕后,MT会对磁盘上所有文件进行一次归并排序:合并文件并排序
+* ReduceTask(RT)
+  * 从每个MT上远程拷贝相应的数据文件
+  * 若文件大小超过一定阈值,则放到磁盘上,否则放到内存中
+  * 若磁盘上文件数目达到一定阈值,则进行一次合并以生成一个更大文件
+  * 如果内存中文件大小或者数目超过一定阈值,则进行一次合并后将数据写到磁盘上
+  * 当所有数据拷贝完毕后,RT统一对内存和磁盘上的所有数据进行一次归并排序
+* 排序的分类
+  * 部分排序:MR根据输入记录的键对数据集排序,保证输出的每个文件内部有序
+  * 全排序:最终输出结果只有一个文件,且文件内部有序
+    * 只使用一个分区就会产生全排序,也只输出一个结果
+    * 该方法在处理大型文件时效率极低,因为一台机器必须处理所有输出文件,从而完全丧失了MR所提供的并行架构
+    * 替代方案:
+      * 首先创建一系列排好序的文件
+      * 其次,串联这些文件;
+      * 最后,生成一个全局排序的文件
+      * 主要思路是使用一个分区来描述输出的全局排序
+      * 例如:可以为上述文件创建3个分区,在第一分区中,记录的单词首字母a-g,第二分区记录单词首字母h-n, 第三分区记录单词首字母o-z
+  * 辅助排序:GroupingComparator分组,在Reducer端对key进行分组,应用于:在接收的key为bean对象时,想让一个或几个字段相同(全部字段比较不相同)的key进入到同一个reduce方法时,可才分组排序
+  * 二次排序:在自定义排序过程中,如果compareTo中的判断条件为两个则为二次排序
+* 案例:paradise-study-hdfs/com.wy.sort
+
+
+
+## Combiner合并
+
+* combiner是MR程序中Mapper和Reducer之外的一种组件
+
+* combiner组件的父类就是Reducer
+
+* combiner和reducer的区别在于运行的位置:
+
+  * Combiner是在每一个maptask所在的节点运行
+  * Reducer是接收全局所有Mapper的输出结果
+
+* combiner的意义就是对每一个maptask的输出进行局部汇总,以减小网络传输量
+
+* 自定义Combiner实现步骤:
+
+  * 自定义一个combiner继承Reducer,重写reduce方法
+
+    ```java
+    public class  WordcountCombiner extends Reducer<Text, IntWritable, Text,  IntWritable>{
+        @Override
+        protected void reduce(Text key,  Iterable<IntWritable> values,Context context) throws  IOException, InterruptedException {
+            int count = 0;
+            for(IntWritable v :values){
+                count = v.get();
+            }
+            context.write(key, new  IntWritable(count));
+        }
+    }
+    ```
+
+  * 在job启动类中设置:job.setCombinerClass(WordcountCombiner.class);
+
+* combiner能够应用的前提是不能影响最终的业务逻辑,而且,combiner的输出kv应该跟reducer的输入kv类型要对应起来
+
+
+
+## GroupingComparator分组（辅助排序）
+
+* 对Reduce阶段的数据根据某一个或几个字段进行分组
+
+* 分组排序步骤:
+
+  * 自定义类继承WritableComparator
+
+  * 重写compare()方法
+
+    ```java
+    @Override
+    public int compare(WritableComparable a, WritableComparable b) {
+       // 比较的业务逻辑
+       return result;
+    }
+    ```
+
+* 创建一个构造将比较对象的类传给父类
+
+  ```java
+  protected OrderGroupingComparator() {
+     super(OrderBean.class, true);
+  }
+  ```
+
+
+
 # HDFS
 
 
@@ -561,7 +657,7 @@
    ```shell
    systemctl stop firewalld.service #停止firewall
    systemctl disable firewalld.service #禁止firewall开机启动
-   firewall-cmd --state #查看默认防火墙状态（关闭后显示notrunning，开启后显示running）
+   firewall-cmd --state #查看默认防火墙状态（关闭后显示notrunning,开启后显示running）
    vi /etc/selinux/config # 将SELINUX=enforcing改为SELINUX=disabled
    ```
 
