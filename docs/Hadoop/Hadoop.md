@@ -279,7 +279,7 @@
 
 
 
-# MapReduce
+# MapReduce(MR)
 
 是一个分布式运算程序的编程框架,核心功能是将用户编写的业务逻辑代码和自带默认组件整合成一个完整的分布式运算程序,并发运行在一个hadoop集群上
 
@@ -602,9 +602,7 @@
 # API
 
 * hadoop fs:查看hadoop的命令,大部分和linux类似,但是都是以hadoop fs开头
-
 * hadoop checknative -a:检查hadoop本地库是否正常,false不正常
-
 * hadoop fs [] 
 
   * -ls /file:查看上传的文件是否成功,成功会列出文件地址,否则报错文件不存在
@@ -617,10 +615,53 @@
   * -getmerge folder file:将hdfs中的多个文件合并下载到本地
   * -cat /file:查看hadoop中某个文件的内容
   * -rm -r /file:删除hadoop集群中的文件或目录
-
 * hadoop jar XXX.jar xx.xx.xxx.TestMain /input /output:运行jar包,需要指定main所在类,/input表示上传文件所在地址,/output表示文件输出地址,且该地址不能是已经存在的
-
 * hadoop distcp hdfs://hadoop001:9000/file1 hdfs://hadoop002:9000/file2:hadoop2.0才有该命令,可以实现直接将hdfs中的file1复制到hdfs的file2中,而且是递归复制
+
+
+
+# YARN
+
+## 配置
+
+```xml
+<!-- 单个任务可申请的最小虚拟CPU个数 -->
+<property>
+	<name>yarn.scheduler.minimum-allocation-vcores</name>
+	<value>1</value>
+</property>
+<!-- 单个任务可申请的最大虚拟CPU个数,该参数对应yarn.nodemanager.resource.cpu-vcores,建议最大为一个物理CPU的数量 -->
+<property>
+	<name>yarn.scheduler.maximum-allocation-vcores</name>
+	<value>3</value>
+</property>
+<!-- 该节点上可分配的物理内存总量 -->
+<property>
+	<name>yarn.nodemanager.resource.memory-mb</name>
+	<value>1024</value>
+</property>
+<!-- 该节点上YARN可使用的虚拟CPU个数,一个物理CPU对应3个虚拟CPU -->
+<property>
+	<name>yarn.nodemanager.resource.cpu-vcores</name>
+	<value>3</value>
+</property>
+<!-- 单个任务可申请的最多物理内存量 -->
+<property>
+	<name>yarn.scheduler.maximum-allocation-mb</name>
+	<value>43008</value>
+</property>
+
+<!-- 是否开启YARN ha -->
+<property>
+	<name>yarn.resourcemanager.ha.enabled</name>
+	<value>true</value>
+</property>
+<!-- ha状态切换为自动切换 -->
+<property>
+	<name>yarn.resourcemanager.ha.automatic-failover.embedded</name>
+	<value>true</value>
+</property>
+```
 
 
 
