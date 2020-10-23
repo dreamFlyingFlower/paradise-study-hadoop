@@ -8,14 +8,43 @@
 * Oozie需要部署到Java Servlet容器中运行
 * Oozie在集群中扮演的角色:定时调度任务,多任务可以按照执行的逻辑顺序调度
 * Oozie的功能模块
-  		* Workflow:顺序执行流程节点,支持fork（分支多个节点）,join（合并多个节点为一个）
+  		* Workflow:顺序执行流程节点,支持fork(分支多个节点),join(合并多个节点为一个)
   * Coordinator:定时触发workflow
   * Bundle Job:绑定多个Coordinator
-* Oozie的节点
-  		* 控制流节点(Control Flow Nodes):控制流节点一般都是定义在工作流开始或者结束的位置,比如start,end,kill等。以及提供工作流的执行路径机制,如decision,fork,join等
-  * 动作节点(Action  Nodes):就是执行具体任务动作的节点
+* Oozie的常用节点
+  		* 控制流节点(Control Flow Nodes):控制流节点一般都是定义在工作流开始或者结束的位置,比如start,end,kill等,以及提供工作流的执行路径机制,如decision,fork,join等
+  * 动作节点(Action  Nodes):就是执行具体任务动作的节点,比如执行某个shell脚本
 
 
+
+# 编译
+
+* [官网](http://www.apache.org/dyn/closer.lua/oozie/)下载oozie源码
+
+* 配置JDK,Maven,Pig
+
+* 修改oozie源码中的pom.xml,根据服务器上hadoop等其他软件的版本进行修改
+
+  ```xml
+  <targetJavaVersion>1.8</targetJavaVersion>
+  <hadoop.version>2.7.2</hadoop.version>
+  <hadoop.majorversion>2</hadoop.majorversion>
+  <pig.version>0.13.0</pig.version>
+  <maven.javadoc.opts>-Xdoclint:none</maven.javadoc.opts>
+  <spark.version>2.1.1</spark.version>
+  <sqoop.version>1.99.7</sqoop.version>
+  <hive.version>1.2.2</hive.version>
+  <hbase.version>1.3.1</hbase.version>
+  ```
+
+* 编译
+
+  ```shell
+  bin/mkdistro.sh -Phadoop-2 -Dhadoop.auth.version=2.7.2 -Ddistcp.version=2.7.2 -Dhadoop.version=2.7.2 -Dsqoop.version=1.99.7 -DskipTests
+  bin/mkdistro.sh -DskipTests -Phadoop-2 -Dhadoop.version=2.7.2 
+  ```
+
+  
 
 # 安装
 
@@ -113,7 +142,7 @@
   bin/oozie-setup.sh sharelib create -fs hdfs://hadoop-senior01.itguigu.com:8020 -locallib oozie-sharelib-4.0.0-cdh5.3.6-yarn.tar.gz
   ```
 
-* 创建oozie.sql文件
+* 执行oozie.sql文件
 
   ```shell
   bin/oozie-setup.sh db create -run -sqlfile oozie.sql
@@ -158,7 +187,9 @@
   # 队列名称
   queueName=default
   examplesRoot=oozie-apps
+  # 指定需要执行的脚本目录
   oozie.wf.application.path=${nameNode}/user/${user.name}/${examplesRoot}/shell
+  # 需要执行的脚本
   EXEC=p1.sh
   ```
 
@@ -166,7 +197,9 @@
 
   ```xml
   <workflow-app xmlns="uri:oozie:workflow:0.4" name="shell-wf">
+      <!-- to:下一步的流程,由标签的name属性决定 -->
   	<start to="shell-node"/>
+      <!-- name为标签的唯一标识,决定流程的走向 -->
   	<action name="shell-node">
           <shell xmlns="uri:oozie:shell-action:0.2">
               <job-tracker>${jobTracker}</job-tracker>
@@ -179,9 +212,11 @@
               </configuration>
               <exec>${EXEC}</exec>
               <!-- <argument>my_output=Hello Oozie</argument> -->
-              <file>/user/admin/oozie-apps/shell/${EXEC}#${EXEC}</file>
+              <!-- 注意要执行脚本的前面有个# -->
+              <file>/user/root/oozie-apps/shell/${EXEC}#${EXEC}</file>
           	<capture-output/>
       	</shell>
+          <!-- 成功或失败的流程 -->
           <ok to="end"/>
           <error to="fail"/>
   	</action>
@@ -259,7 +294,7 @@
                   </property>
               </configuration>
               <exec>${EXEC1}</exec>
-              <file>/user/admin/oozie-apps/shell/${EXEC1}#${EXEC1}</file>
+              <file>/user/root/oozie-apps/shell/${EXEC1}#${EXEC1}</file>
               <!-- <argument>my_output=Hello Oozie</argument>-->
               <capture-output/>
           </shell>
@@ -277,7 +312,7 @@
                   </property>
               </configuration>
               <exec>${EXEC2}</exec>
-              <file>/user/admin/oozie-apps/shell/${EXEC2}#${EXEC2}</file>
+              <file>/user/root/oozie-apps/shell/${EXEC2}#${EXEC2}</file>
               <!-- <argument>my_output=Hello Oozie</argument>-->
               <capture-output/>
           </shell>
