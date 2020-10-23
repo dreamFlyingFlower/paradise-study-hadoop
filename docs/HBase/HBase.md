@@ -149,7 +149,31 @@
 
 # 安装
 
-* 下载解压hbase安装包,解压后进入配置文件夹conf,复制hadoop的hdfs-site.xml和core-site.xml到hbase的conf文件夹下.[配置](http://abloz.com/hbase/book.html#hbase_default_configurations)
+## 单机版
+
+* 下载解压HBase安装包到/app/hbase中
+
+* 配置Java环境变量
+
+* 进入conf目录,配置hbase-site.xml文件
+
+  ```xml
+  <!-- 指定hbase的数据目录,若不设置,默认在/tmp目录下 -->
+  <property>
+  	<name>hbase.rootdir</name>
+  	<value>file:///app/hbase/data</value>
+  </property>
+  ```
+
+* 启动:bin/start-hbase.sh
+
+
+
+## 伪分布式
+
+* 在单机版基础上还需要增加其他[配置](http://abloz.com/hbase/book.html#hbase_default_configurations)
+
+* 复制hadoop的hdfs-site.xml和core-site.xml到hbase的conf文件夹下.
 
 * 修改hbase-env.sh
 
@@ -215,7 +239,7 @@
 
 
 
-## Shell操作HBase
+# Shell操作
 
 * create 'tablename','列名1','列名2','列名...':创建表
 * list:查看存在那些表
@@ -234,47 +258,29 @@
 
 
 
-## zk安装
+# Coprocessor
 
-* 下载zk安装包解压之后修改zoo.cfg配置文件,在最后一行加上server.1=localhost:2888:3888
-* 在指定的data目录下新建一个myid文件,只需要添加一个数字1即可,和server.1后面的1一致
+* HBase的协处理器,为用户提供类库和运行时环境,使代码能够在HBase RegionServer和Master上运行
 
-
-
-## HBase Coprocessor
-
-​		HBase协处理器
-
-* 协处理器为用户提供类库和运行时环境,是的代码能够在HBase RegionServer和Master上运行
 * 协处理器分为系统协处理器和表协处理器
-* 系统协处理器
+* 系统协处理器:全局加载到Regionserver托管的所有表和region上,针对整个hbase集群
 
->
-	全局加载到Regionserver托管的所有表和region上,针对整个hbase集群
-
-* 表协处理器
-
->
-	用户可以指定一张表使用协处理器,只针对一张表
+* 表协处理器:用户可以指定一张表使用协处理器,只针对一张表
 
 * Observer(观察者):类似于传统数据库的触发器
-
->
-	RegionObserver:提供客户端的数据操作事件钩子:get,put,delete,scan
-	MasterObserver:提供DDL类型的操作钩子,如创建,删除,修改数据表等
-	WALObserver:提供WAL相关日志操作钩子
-	应用:安全性,在执行get或put之前,通过preGet或prePut方法检查是否允许该操作
-		引用完整性约束:HBase不支持关系型数据库中的引用完整性约束概念,即外键,可以使用协处理器增强这种约束
-		二级索引:可以使用协处理器来维持一个二级索引
+  * RegionObserver:提供客户端的数据操作事件钩子:get,put,delete,scan
+  * MasterObserver:提供DDL类型的操作钩子,如创建,删除,修改数据表等
+  * WALObserver:提供WAL相关日志操作钩子
+  * 应用:安全性,在执行get或put之前,通过preGet或prePut方法检查是否允许该操作
+  * 引用完整性约束:HBase不支持关系型数据库中的引用完整性约束概念,即外键,可以使用协处理器增强这种约束
+  * 二级索引:可以使用协处理器来维持一个二级索引
 
 * Endpoint(终端):动态的终端有点像存储过程,是动态RPC插件的接口,他实现的代码被安装在服务器,从而能通过hbase rpc唤醒
-
->
-	调用接口,他们的实现代码会被目标RegionServer远程执行
+* 调用接口,他们的实现代码会被目标RegionServer远程执行
 
 
 
-# HBase容灾备份
+# 容灾备份
 
 
 
@@ -346,7 +352,7 @@
 
 
 
-# HBase监控
+# 监控
 
 * Ambari:apache开源软件,创建,管理,监视hadoop的集群,可监控hadoop,hbase,hive,zk等
 * Hadoop启动之后默认的监控页面:ip:50070,也可以通过ip:50070/jmx获取json信息

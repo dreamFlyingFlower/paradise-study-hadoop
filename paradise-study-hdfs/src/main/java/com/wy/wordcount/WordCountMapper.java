@@ -10,7 +10,7 @@ import org.apache.hadoop.mapreduce.Mapper;
 /**
  * 继承Mapper,实现其中的map方法,map方法主要是把字符串解析成key-value的形式,发给reduce统计
  * 
- * @apiNote Mapper的泛型类型:<br>
+ * @apiNote Mapper的泛型类型,依次如下:<br>
  *          KEYIN:输入数据的key类型<br>
  *          VALUEIN:输入数据的value类型<br>
  *          KEYOUT:输出数据的key类型<br>
@@ -27,7 +27,9 @@ public class WordCountMapper extends Mapper<Object, Text, Text, IntWritable> {
 	private Text word = new Text();
 
 	/**
-	 * key:每行文件的偏移量 value:每行文件的内容 context:Map端的上下文,包含了OutputCollector和Reporter的功能
+	 * key:指向Mapper泛型参数的KEYIN,即输入的数据的key类型,此处是每行文件的偏移量
+	 * value:指向Mapper泛型参数的VALUEIN,即输入的数据的value类型,此处是每行文件的内容
+	 * context:MR中Map端的上下文,包含了OutputCollector和Reporter的功能
 	 */
 	@Override
 	protected void map(Object key, Text value, Mapper<Object, Text, Text, IntWritable>.Context context)
@@ -36,6 +38,12 @@ public class WordCountMapper extends Mapper<Object, Text, Text, IntWritable> {
 		while (itr.hasMoreTokens()) {
 			word.set(itr.nextToken());
 			context.write(word, ONE);
+			// Hadoop自带的计数器,全局唯一.每运行一次都会加指定的数字
+			context.getCounter(WordCount.WORDCOUNT).increment(1);
 		}
+	}
+
+	enum WordCount {
+		WORDCOUNT;
 	}
 }
