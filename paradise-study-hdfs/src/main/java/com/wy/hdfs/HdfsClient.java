@@ -68,6 +68,8 @@ public class HdfsClient {
 				FileInputStream fileInputStream = new FileInputStream("d:/test/test002.txt");
 				FSDataOutputStream fsdos = fs.create(new Path("/test/test002.txt"));) {
 			IOUtils.copyBytes(fileInputStream, fsdos, configuration);
+			// 立即刷新hdfs中的DN上的数据.对数据的一致性较高的条件时才用
+			fsdos.hflush();
 			fs.copyFromLocalFile(new Path("d:/test/test002.txt"), new Path("/test/test002.txt"));
 		} catch (IOException | InterruptedException | URISyntaxException e) {
 			e.printStackTrace();

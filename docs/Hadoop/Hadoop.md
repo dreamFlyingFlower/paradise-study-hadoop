@@ -60,6 +60,7 @@
 * 文件与文件的block大小可以不一样
 * 一个文件除最后一个block,其他block大小一致
 * block的大小依据硬件的IO特性调整,如果性能好就可以加大该值
+* block中包含真实的文件数据,数据长度,校验和(文件完整性校验),时间戳
 * block被分散存放在集群的节点汇总,具有location
 * block具有副本(replication),没有主从概念,副本不能出现在同一个节点,是满足可靠性和性能的关键
 * 文件上传可以指定block大小和副本数,上传后只能修改副本数
@@ -78,10 +79,14 @@
 
 
 
-## NameNode(NN)
+# HDFS
 
-* 文件元数据节点
-* 存储文件元数据,包括文件名,目录结构,属性,以及每个文件的block列表和block所在的datanode
+
+
+# NameNode(NN)
+
+* 文件元数据(metadata)节点
+* 存储文件元数据,包括文件名,目录结构,属性,每个文件的block列表和block所在的datanode
 * 完全基于内存运行
 * 需要持久化方案保证数据可靠性
 * 提供副本放置策略
@@ -96,9 +101,11 @@
 
 
 
-### NN故障处理
+## NN故障处理
 
-#### 第一种
+
+
+### 第一种
 
 * 将SNN中数据拷贝到NN存储的目录
   * kill -9 NN进程
@@ -106,7 +113,9 @@
   * 拷贝SNN中数据到原NN存储数据目录
   * 重启NN
 
-#### 第二种
+
+
+### 第二种
 
 * 使用-importCheckpoint选项启动NN守护进程,从而将SNN中数据拷贝到NN目录中
 
@@ -137,7 +146,7 @@
 
 
 
-### NN多目录配置
+## NN多目录配置
 
 * 在hdfs-site.xml中添加如下内容
 
@@ -154,7 +163,7 @@
 
 
 
-## 安全模式
+# 安全模式
 
 * HDFS搭建时会先格式化,此时会产生一个空的FsImage
 * 当NN启动时,它从硬盘中读取EditLog和FsImage
@@ -173,7 +182,7 @@
 
 
 
-## DataNode(DN)
+# DataNode(DN)
 
 * 数据节点,在本地文件系统存储文件块数据(block),以及提供块数据的校验,读写
 * DataNode和NameNode维持心跳,并汇报自己持有的block信息
@@ -182,7 +191,7 @@
 
 
 
-### DN数据完整性
+## DN数据完整性
 
 * 当DN读取Block数据时,会计算CheckSum
 * 若计算后的CheckSum与Block创建时不一样,说明Block已经损坏
@@ -191,7 +200,7 @@
 
 
 
-### DN心跳
+## DN心跳
 
 * DN进程死亡或网络故障造成DN无法与NN通信,NN不会立即将该节点判定为离线,要经过一段时间,这段时间称为超时时长
 
@@ -206,7 +215,7 @@
 
 
 
-### DN多目录
+## DN多目录
 
 * DN可以配置多个目录,每个目录存储的数据不一样,即数据不是副本
 
@@ -221,7 +230,31 @@
 
 
 
-## Secondary NameNode(SNN)
+## DN新增
+
+* 复制已有的DN,修改IP和主机名
+* 修改xcall和xsync脚本,增加新节点的同步
+* 删除原来DN的HDFS文件系统留下的data和logs目录
+* source一下配置文件,之后直接启动DN:hadoop-daemon.sh start datanode
+* 也可以重新配置一台机器,但太费事
+
+
+
+## DN退役
+
+
+
+## DN核心
+
+
+
+## DN目录结构
+
+* DN的数据放在由配置文件core-site.xml指定的hadoop.tmp.dir下
+
+
+
+# Secondary NameNode(SNN)
 
 * 监控hdfs状态的辅助后台程序,每隔一段时间获得hdfs元数据的快照
 
@@ -231,219 +264,7 @@
 
 
 
-# MapReduce(MR)
-
-是一个分布式运算程序的编程框架,核心功能是将用户编写的业务逻辑代码和自带默认组件整合成一个完整的分布式运算程序,并发运行在一个hadoop集群上
-
-
-
-## 优点
-
-* MR易于编程,简单的实现一些接口就可以完成一个分布式程序
-* 良好的扩展性,可以通过增加机器来增加程序的计算能力
-* 高容错性,即使集群中的一台机器挂掉了,它可以把上面的计算任务转移到另外一个节点上运行
-* 适合PB级别以上海量数据的离线处理
-
-
-
-## 缺点
-
-* MR不适合做实时计算,流式计算,DAG(有向图)计算
-* 实时计算:因为MR是读取磁盘上的文件,做处理比较慢
-* 流式计算:流式计算的输入数据是动态的,而MR的输入数据是静态的,这取决于MR的设计特点
-* DAG:多个应用程序存在依赖关系,后一个应用程序的输入为前一个的输出.在这种情况下,MR作业的结果会写入到磁盘中,会产生大量的磁盘IO,导致性能很低
-
-
-
-## 流程
-
-* 分为Map和Reduce阶段,M安排阶段的并发MapTask,完全并行运行,互不干涉
-* Reduce阶段并发ReduceTask,互不干涉,数据都依赖于Map阶段的MapTask输出的实例
-* MR只能包含一个Map阶段和一个Reduce阶段,如果逻辑很复杂,只能多个MR串行运行
-* 将文件中的内容按行读取,之后按照空格进行切分
-* 再开辟空间进行分区排序,排序按字典排序,将结果放在一个类似map的集合中
-* 排序之后再将相同的项进行合并
-
-
-
-## 核心
-
-* MrAppMaster:负责整个程序的过程调度及状态协调
-* MapTask:负责Map阶段的整个数据处理流程
-* ReduceTask:负责Reduce阶段的整个数据处理流程
-
-
-
-## 编程规范
-
-
-
-### Mapper阶段
-
-1. 用户自定义的Mapper要继承自己的父类
-2. Mapper的输入数据是KV对的形式
-3. Mapper中的业务逻辑卸载map()方法中
-4. Mapper的输出数据是KV对的形式
-5. map()方法(MapTask进程)对每一KV对调用一次
-
-
-
-### Reducer阶段
-
-1. 用户自定义的Reducer要继承自己的父类
-2. Reducer的输入数据类型对应Mapper的输出数据类型,也是KV
-3. Reducer的业务逻辑卸载reduce()方法中
-4. ReduceTask进程对每一组相同k的KV组调用一次reduce()方法
-
-
-
-### Driver阶段
-
-1. 相当于YARN集群的客户端,用于提交整个程序到YARN集群,提交的是封装了MR程序相关运行参数的job对象
-2. 获取配置信息,获取job对象实例
-3. 指定本程序的jar包所在的本地路径
-4. 关联Mapper/Reducer业务类
-5. 指定Mapper输出数据的kv类型
-6. 指定最终输出的数据的kv类型
-7. 指定kv的输入原始文件所在目录
-8. 指定job的输出结果多在目录
-9. 提交作业
-
-
-
-## 序列化
-
-* Hadoop自带的序列化(Writable),不使用Java的序列化(比较重量级)
-* 紧凑:高效使用存储空间
-* 快速:读写数据的额外开销小
-* 可扩展:随着通信协议的升级和升级
-* 互操作:支持多语言的交互
-
-
-
-### 实现序列化
-
-1. 必须实现Writable接口
-2. 反序列化时,需要反射调用空参构造函数,所以必须有空参构造
-3. 重写序列化方法
-4. 重写反序列化方法
-5. 注意反序列化的顺序和序列化的顺序完全一致
-6. 要想把结果显示在文件中,需要重写toString(),可用”\t”分开,方便后续用
-7. 如果需要将自定义的bean放在key中传输,则还需要实现Comparable接口,因为MapReduce框中的Shuffle过程要求对key必须能排序
-
-
-
-## MapTask并行度
-
-* 数据切片:数据切片只是在逻辑上对输入进行分片,并不会在磁盘上将其切分成片进行存储
-* 一个job的Map阶段并行度由客户端在提交job时的切片数决定
-* 每个Split切片分配一个MapTask并行实例处理
-* 默认情况下,切片大小等于Block大小
-* 切片时不考虑数据集整体,而是逐个针对每个文件单独切片
-
-
-
-## WritableComparable排序
-
-* 排序是MR框架中最重要的操作之一,MapTask和ReduceTask均会对数据(按照key)进行排序
-* 排序操作属于Hadoop的默认行为,任何应用程序中的数据均会被排序,不管逻辑上是否需要
-* 默认排序是按照字典顺序排序,且实际该排序方式是快速排序
-* MapTask(MT)
-  * 将处理的结果暂时放到一个缓冲区中
-  * 当缓冲区使用率达到一定阈值(80%)后,对缓冲区的数据进行一次快速排序,并将结果写到磁盘上
-  * 当数据处理完毕后,MT会对磁盘上所有文件进行一次归并排序:合并文件并排序
-* ReduceTask(RT)
-  * 从每个MT上远程拷贝相应的数据文件
-  * 若文件大小超过一定阈值,则放到磁盘上,否则放到内存中
-  * 若磁盘上文件数目达到一定阈值,则进行一次合并以生成一个更大文件
-  * 如果内存中文件大小或者数目超过一定阈值,则进行一次合并后将数据写到磁盘上
-  * 当所有数据拷贝完毕后,RT统一对内存和磁盘上的所有数据进行一次归并排序
-* 排序的分类
-  * 部分排序:MR根据输入记录的键对数据集排序,保证输出的每个文件内部有序
-  * 全排序:最终输出结果只有一个文件,且文件内部有序
-    * 只使用一个分区就会产生全排序,也只输出一个结果
-    * 该方法在处理大型文件时效率极低,因为一台机器必须处理所有输出文件,从而完全丧失了MR所提供的并行架构
-    * 替代方案:
-      * 首先创建一系列排好序的文件
-      * 其次,串联这些文件;
-      * 最后,生成一个全局排序的文件
-      * 主要思路是使用一个分区来描述输出的全局排序
-      * 例如:可以为上述文件创建3个分区,在第一分区中,记录的单词首字母a-g,第二分区记录单词首字母h-n, 第三分区记录单词首字母o-z
-  * 辅助排序:GroupingComparator分组,在Reducer端对key进行分组,应用于:在接收的key为bean对象时,想让一个或几个字段相同(全部字段比较不相同)的key进入到同一个reduce方法时,可才分组排序
-  * 二次排序:在自定义排序过程中,如果compareTo中的判断条件为两个则为二次排序
-* 案例:paradise-study-hdfs/com.wy.sort
-
-
-
-## Combiner合并
-
-* combiner是MR程序中Mapper和Reducer之外的一种组件
-
-* combiner组件的父类就是Reducer
-
-* combiner和reducer的区别在于运行的位置:
-
-  * Combiner是在每一个maptask所在的节点运行
-  * Reducer是接收全局所有Mapper的输出结果
-
-* combiner的意义就是对每一个maptask的输出进行局部汇总,以减小网络传输量
-
-* 自定义Combiner实现步骤:
-
-  * 自定义一个combiner继承Reducer,重写reduce方法
-
-    ```java
-    public class  WordcountCombiner extends Reducer<Text, IntWritable, Text,  IntWritable>{
-        @Override
-        protected void reduce(Text key,  Iterable<IntWritable> values,Context context) throws  IOException, InterruptedException {
-            int count = 0;
-            for(IntWritable v :values){
-                count = v.get();
-            }
-            context.write(key, new  IntWritable(count));
-        }
-    }
-    ```
-
-  * 在job启动类中设置:job.setCombinerClass(WordcountCombiner.class);
-
-* combiner能够应用的前提是不能影响最终的业务逻辑,而且,combiner的输出kv应该跟reducer的输入kv类型要对应起来
-
-
-
-## GroupingComparator分组（辅助排序）
-
-* 对Reduce阶段的数据根据某一个或几个字段进行分组
-
-* 分组排序步骤:
-
-  * 自定义类继承WritableComparator
-
-  * 重写compare()方法
-
-    ```java
-    @Override
-    public int compare(WritableComparable a, WritableComparable b) {
-       // 比较的业务逻辑
-       return result;
-    }
-    ```
-
-* 创建一个构造将比较对象的类传给父类
-
-  ```java
-  protected OrderGroupingComparator() {
-     super(OrderBean.class, true);
-  }
-  ```
-
-
-
-# HDFS
-
-
-
-## 写流程
+# 写流程
 
 * Client和NN连接创建文件元数据,连接后NN判定元数据是否有效
 * NN触发副本放置策略,返回一个有序的DN列表
@@ -457,7 +278,7 @@
 
 
 
-## 读流程
+# 读流程
 
 * 为降低整体带宽消耗和读取延迟,HDFS会进来让读取程序取离它最近的副本
 * 如果在读取程序的同一个机架上有一个副本,那么就读取该副本
@@ -469,9 +290,9 @@
 
 
 
-## 2.X新特性
+# 2.X新特性
 
-### 集群间数据拷贝
+## 集群间数据拷贝
 
 * distcp实现两个远程主机之间的文件复制,从src拷贝到des
 
@@ -481,7 +302,7 @@
 
 
 
-### 小文件存档
+## 小文件存档
 
 * 每个文件均按块存储,每个块的元数据存储在NN的内存中,因此HDFS存储小文件会非常低效.因为大量的小文件会耗尽NN中的大部分内存,但是存储小文件所需要的磁盘容量和数据块的大小无关
 
@@ -498,7 +319,7 @@
 
 
 
-### 回收站
+## 回收站
 
 * 在core-site.xml中添加如下配置
 
@@ -538,7 +359,7 @@
 
   
 
-### 快照管理
+## 快照管理
 
 * 快照相当于对目录做一个备份,并不会立即复制所有文件,当写入时才会产生新文件
 * hdfs dfsadmin -allowSnapshot path:开启指定目录的快照功能
@@ -551,11 +372,214 @@
 
 
 
+# MapReduce(MR)
+
+是一个分布式运算程序的编程框架,核心功能是将用户编写的业务逻辑代码和自带默认组件整合成一个完整的分布式运算程序,并发运行在一个hadoop集群上
+
+
+
+# 优点
+
+* MR易于编程,简单的实现一些接口就可以完成一个分布式程序
+* 良好的扩展性,可以通过增加机器来增加程序的计算能力
+* 高容错性,即使集群中的一台机器挂掉了,它可以把上面的计算任务转移到另外一个节点上运行
+* 适合PB级别以上海量数据的离线处理
+
+
+
+# 缺点
+
+* MR不适合做实时计算,流式计算,DAG(有向图)计算
+* 实时计算:因为MR是读取磁盘上的文件,做处理比较慢
+* 流式计算:流式计算的输入数据是动态的,而MR的输入数据是静态的,这取决于MR的设计特点
+* DAG:多个应用程序存在依赖关系,后一个应用程序的输入为前一个的输出.在这种情况下,MR作业的结果会写入到磁盘中,会产生大量的磁盘IO,导致性能很低
+
+
+
+# 核心
+
+* 分布式运算程序分为Map和Reduce阶段
+* MapTask实例:负责Map阶段的整个数据处理,完全并行运行,互不干涉
+* ReduceTask实例:负责Reduce阶段数据处理,并发运行,互不干涉,数据依赖于Map的输出
+* MR只能包含一个Map阶段和一个Reduce阶段,如果逻辑很复杂,只能多个MR串行运行
+* 将文件中的内容按行读取,之后按照空格进行切分
+* 再开辟空间进行分区排序,排序按字典排序,将结果放在一个类似map的集合中
+* 排序之后再将相同的项进行合并
+
+* MrAppMaster:负责整个程序的过程调度及状态协调
+
+
+
+# 编程规范
+
+
+
+## Mapper阶段
+
+1. 用户自定义的Mapper要继承自己的父类
+2. Mapper的输入数据是KV对的形式
+3. Mapper中的业务逻辑卸载map()方法中
+4. Mapper的输出数据是KV对的形式
+5. map()方法(MapTask进程)对每一KV对调用一次
+
+
+
+## Reducer阶段
+
+1. 用户自定义的Reducer要继承自己的父类
+2. Reducer的输入数据类型对应Mapper的输出数据类型,也是KV
+3. Reducer的业务逻辑卸载reduce()方法中
+4. ReduceTask进程对每一组相同k的KV组调用一次reduce()方法
+
+
+
+## Driver阶段
+
+1. 相当于YARN集群的客户端,用于提交整个程序到YARN集群,提交的是封装了MR程序相关运行参数的job对象
+2. 获取配置信息,获取job对象实例
+3. 指定本程序的jar包所在的本地路径
+4. 关联Mapper/Reducer业务类
+5. 指定Mapper输出数据的kv类型
+6. 指定最终输出的数据的kv类型
+7. 指定kv的输入原始文件所在目录
+8. 指定job的输出结果多在目录
+9. 提交作业
+
+
+
+# 序列化
+
+* Hadoop自带的序列化(Writable),不使用Java的序列化(比较重量级)
+* 紧凑:高效使用存储空间
+* 快速:读写数据的额外开销小
+* 可扩展:随着通信协议的升级和升级
+* 互操作:支持多语言的交互
+
+
+
+## 实现序列化
+
+1. 必须实现Writable接口
+2. 反序列化时,需要反射调用空参构造函数,所以必须有空参构造
+3. 重写序列化方法
+4. 重写反序列化方法
+5. 注意反序列化的顺序和序列化的顺序完全一致
+6. 要想把结果显示在文件中,需要重写toString(),可用”\t”分开,方便后续用
+7. 如果需要将自定义的bean放在key中传输,则还需要实现Comparable接口,因为MapReduce框中的Shuffle过程要求对key必须能排序
+
+
+
+# MapTask并行度
+
+* 数据切片:数据切片只是在逻辑上对输入进行分片,并不会在磁盘上将其切分成片进行存储
+* 一个job的Map阶段并行度由客户端在提交job时的切片数决定
+* 每个Split切片分配一个MapTask并行实例处理
+* 默认情况下,切片大小等于Block大小
+* 切片时不考虑数据集整体,而是逐个针对每个文件单独切片
+
+
+
+# WritableComparable排序
+
+* 排序是MR框架中最重要的操作之一,MapTask和ReduceTask均会对数据(按照key)进行排序
+* 排序操作属于Hadoop的默认行为,任何应用程序中的数据均会被排序,不管逻辑上是否需要
+* 默认排序是按照字典顺序排序,且实际该排序方式是快速排序
+* MapTask(MT)
+  * 将处理的结果暂时放到一个缓冲区中
+  * 当缓冲区使用率达到一定阈值(80%)后,对缓冲区的数据进行一次快速排序,并将结果写到磁盘上
+  * 当数据处理完毕后,MT会对磁盘上所有文件进行一次归并排序:合并文件并排序
+* ReduceTask(RT)
+  * 从每个MT上远程拷贝相应的数据文件
+  * 若文件大小超过一定阈值,则放到磁盘上,否则放到内存中
+  * 若磁盘上文件数目达到一定阈值,则进行一次合并以生成一个更大文件
+  * 如果内存中文件大小或者数目超过一定阈值,则进行一次合并后将数据写到磁盘上
+  * 当所有数据拷贝完毕后,RT统一对内存和磁盘上的所有数据进行一次归并排序
+* 排序的分类
+  * 部分排序:MR根据输入记录的键对数据集排序,保证输出的每个文件内部有序
+  * 全排序:最终输出结果只有一个文件,且文件内部有序
+    * 只使用一个分区就会产生全排序,也只输出一个结果
+    * 该方法在处理大型文件时效率极低,因为一台机器必须处理所有输出文件,从而完全丧失了MR所提供的并行架构
+    * 替代方案:
+      * 首先创建一系列排好序的文件
+      * 其次,串联这些文件;
+      * 最后,生成一个全局排序的文件
+      * 主要思路是使用一个分区来描述输出的全局排序
+      * 例如:可以为上述文件创建3个分区,在第一分区中,记录的单词首字母a-g,第二分区记录单词首字母h-n, 第三分区记录单词首字母o-z
+  * 辅助排序:GroupingComparator分组,在Reducer端对key进行分组,应用于:在接收的key为bean对象时,想让一个或几个字段相同(全部字段比较不相同)的key进入到同一个reduce方法时,可才分组排序
+  * 二次排序:在自定义排序过程中,如果compareTo中的判断条件为两个则为二次排序
+* 案例:paradise-study-hdfs/com.wy.sort
+
+
+
+# Combiner合并
+
+* combiner是MR程序中Mapper和Reducer之外的一种组件
+
+* combiner组件的父类就是Reducer
+
+* combiner和reducer的区别在于运行的位置:
+
+  * Combiner是在每一个maptask所在的节点运行
+  * Reducer是接收全局所有Mapper的输出结果
+
+* combiner的意义就是对每一个maptask的输出进行局部汇总,以减小网络传输量
+
+* 自定义Combiner实现步骤:
+
+  * 自定义一个combiner继承Reducer,重写reduce方法
+
+    ```java
+    public class  WordcountCombiner extends Reducer<Text, IntWritable, Text,  IntWritable>{
+        @Override
+        protected void reduce(Text key,  Iterable<IntWritable> values,Context context) throws  IOException, InterruptedException {
+            int count = 0;
+            for(IntWritable v :values){
+                count = v.get();
+            }
+            context.write(key, new  IntWritable(count));
+        }
+    }
+    ```
+
+  * 在job启动类中设置:job.setCombinerClass(WordcountCombiner.class);
+
+* combiner能够应用的前提是不能影响最终的业务逻辑,而且,combiner的输出kv应该跟reducer的输入kv类型要对应起来
+
+
+
+# GroupingComparator分组（辅助排序）
+
+* 对Reduce阶段的数据根据某一个或几个字段进行分组
+
+* 分组排序步骤:
+
+  * 自定义类继承WritableComparator
+
+  * 重写compare()方法
+
+    ```java
+    @Override
+    public int compare(WritableComparable a, WritableComparable b) {
+       // 比较的业务逻辑
+       return result;
+    }
+    ```
+
+* 创建一个构造将比较对象的类传给父类
+
+  ```java
+  protected OrderGroupingComparator() {
+     super(OrderBean.class, true);
+  }
+  ```
+
+
+
 # YARN
 
 
 
-## ResourceManager(rm)
+# ResourceManager(rm)
 
 * 资源管理,一个集群只有一个RM是活动状态
 
@@ -566,7 +590,7 @@
 
 
 
-## NodeManager(nm)
+# NodeManager(nm)
 
 * 节点管理,集群中有N个,负责单个节点的资源管理和使用以及task运行状况
 
@@ -576,7 +600,7 @@
 
 
 
-## ApplicationMaster
+# ApplicationMaster
 
 * 每个应用/作业对应一个,并分配给内部任务
 
@@ -587,13 +611,13 @@
 
 
 
-## Container
+# Container
 
 * 对任务运行环境的抽象,封装了CPU,内存等多维资源以及环境变量,启动命令等任务信息
 
 
 
-## YARN执行流程
+# 执行流程
 
 * 用户向YRAN提交作业
 * RM为该作业分配第一个Container(AM)
@@ -605,7 +629,7 @@
 
 
 
-## yarn-site.xml
+# yarn-site.xml
 
 ```xml
 <!-- 单个任务可申请的最小虚拟CPU个数 -->
@@ -647,7 +671,7 @@
 
 
 
-# API
+# Shell API
 
 * hadoop fs:查看hadoop的命令,大部分和linux类似,但是都是以hadoop fs开头
 * hadoop checknative -a:检查hadoop本地库是否正常,false不正常
@@ -891,15 +915,6 @@
 
 
 
-# DN新增
-
-* 复制已有的DN,修改IP和主机名
-* 删除原来DN的HDFS文件系统留下的data和logs目录
-* source一下配置文件,之后直接启动DN:hadoop-daemon.sh start datanode
-* 也可以重新配置一台机器,但太费事
-
-
-
 # 白名单
 
 * 添加白名单,可以控制那些主机能访问NN,那些主机不能访问NN
@@ -959,7 +974,8 @@
 * NameNode主要在以下两个方面影响HDFS集群
   * NameNode机器发生意外,如宕机,集群将无法使用,直到管理员重启
   * NameNode机器需要升级,包括软件,硬件升级,此时集群也将无法使用
-* HDFS HA通过配置Active/Standby两个NameNodes实现集群中对NameNode的热备
+* HDFS HA通过配置Active/Standby两个NN来实现集群中对NN的热备和高可用
+* 当EditLog发生变化时,直接写入JournalNode,以用来分享给其他的NN
 
 
 
