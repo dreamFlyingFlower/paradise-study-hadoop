@@ -53,7 +53,7 @@ public class WordCountDriver {
 			// 设置输入路径和输出路径
 			FileInputFormat.addInputPath(job, new Path(otherArgs[0]));
 			FileOutputFormat.setOutputPath(job, new Path(otherArgs[1]));
-			// 提交job
+			// 提交job,实际上和reducer是一样的效果
 			// job.setCombinerClass(WordCountReducer.class);
 			System.exit(job.waitForCompletion(true) ? 0 : 1);
 		} catch (IOException | ClassNotFoundException | InterruptedException e) {

@@ -12,7 +12,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IOUtils;
 
 /**
- * hdfs使用
+ * hdfs原生使用
  * 
  * @author ParadiseWY
  * @date 2020-10-19 14:26:36

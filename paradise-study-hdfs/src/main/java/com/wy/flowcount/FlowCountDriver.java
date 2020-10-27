@@ -36,9 +36,6 @@ public class FlowCountDriver {
 		// 5 设置最终输出的key和value类型
 		job.setOutputKeyClass(Text.class);
 		job.setOutputValueClass(Flow.class);
-		// job.setPartitionerClass(ProvincePartitioner.class);
-		//
-		// job.setNumReduceTasks(6);
 		// 6 设置输入输出路径
 		FileInputFormat.setInputPaths(job, new Path(args[0]));
 		FileOutputFormat.setOutputPath(job, new Path(args[1]));

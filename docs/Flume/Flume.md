@@ -217,6 +217,8 @@ a2.sinks.k2.channel = c2
   a3.channels.c3.capacity = 1000
   a3.channels.c3.transactionCapacity = 100
   
+  ```
+
 a3.sources.r3.channels = c3
   a3.sinks.k3.channel = c3
   ```
@@ -231,7 +233,7 @@ a3.sources.r3.channels = c3
   * flume-ng agent --conf conf/ --name a4 --conf-file jobconf/flume-hives.conf
   * flume-ng agent --conf conf/ --name a6 --conf-file jobconf/flume-hdfs.conf
 
-```shell
+​```shell
 # flume-hives.conf
 a4.sources = r4
 a4.sinks = k4 k5
@@ -267,7 +269,7 @@ a4.channels.c5.transactionCapacity = 100
 a4.sources.r4.channels = c4 c5
 a4.sinks.k4.channel = c4
 a4.sinks.k5.channel = c5
-```
+  ```
 
 ```shell
 # flume-hdfs.conf

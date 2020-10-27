@@ -1,4 +1,4 @@
-package com.wy.flowcount;
+package com.wy.partition;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Partitioner;

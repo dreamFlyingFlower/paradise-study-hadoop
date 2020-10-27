@@ -136,6 +136,12 @@
   bin/kafka-topics.sh --zookeeper hadoop102:2181 --list
   ```
 
+* 查看某个Topic的详情
+
+  ```shell
+  bin/kafka-topics.sh --zookeeper hadoop102:2181 --describe --topic first
+  ```
+
 * 创建topic
 
   ```shell
@@ -147,7 +153,7 @@
   * --replication-factor:定义副本数
   * --partitions:定义分区数
 
-* 删除topic,需要server.properties中设置delete.topic.enable=true,否则只是标记删除或者直接重启
+* 删除topic,需要server.properties中设置delete.topic.enable=true,否则只是标记删除或直接重启
 
   ```shell
   bin/kafka-topics.sh --zookeeper hadoop102:2181 
@@ -167,11 +173,61 @@
   bin/kafka-console-consumer.sh --zookeeper hadoop102:2181 --from-beginning --topic first --from-beginning
   ```
 
-* 查看某个Topic的详情
+* 集群leader平衡,需要配置auto.leader.rebalance.enable=true
 
   ```shell
-  bin/kafka-topics.sh --zookeeper hadoop102:2181 --describe --topic first
+  bin/kafka-preferred-replica-election.sh --zookeeper hadoop102:2181
   ```
+
+
+
+## 2.4 日志迁移
+
+* 写json文件,文件格式如下
+
+  ```json
+  {"topics": [
+      {"topic": "foo1"},
+      {"topic": "foo2"}
+  ],
+   "version":1
+  }
+  ```
+
+* 使用–generate生成迁移计划,例如将将topic:foo1和foo2移动到broker 5,6
+
+  ```shell
+  # 这一步只是生成计划，并没有执行数据迁移
+  bin/kafka-reassign-partitions.sh --zookeeper localhost:2181 --topics-to-move-json-file topics-to-move.json --broker-list "5,6" –generate
+  ```
+
+* 使用–execute执行计划,执行前最好保存当前的分配情况,以防出错回滚
+
+  ```shell
+  bin/kafka-reassign-partitions.sh --zookeeper localhost:2181 --reassignment-json-file expand-cluster-reassignment.json –execute
+  ```
+
+* 使用–verify验证是否已经迁移完成
+
+* 迁移某个topic的某些特定的partition数据到其他broker,步骤与上面一样,但是json文件如下
+
+  ```json
+  {"version":1,"partitions":[
+      {"topic":"foo1","partition":0,"replicas":[5,6]},
+      {"topic":"foo2","partition":1,"replicas":[2,3]}
+  ]
+  }
+  ```
+
+* kafka-reassign-partitions.sh工具会复制磁盘上的日志文件,只有当完全复制完成,才会删除迁移前磁盘上的日志文件
+* 执行分区日志迁移需要注意:
+  * kafka-reassign-partitions.sh工具的粒度只能到broker,不能到broker的目录
+  * 如果broker上面配置了多个目录,是按照磁盘上面已驻留的分区数来均匀分配的
+  * 所以如果topic之间的数据,或者topic的partition之间的数据本身就不均匀,很有可能造成磁盘数据的不均匀
+  * 对于分区数据较多的分区迁移数据会花大量的时间,所以建议在topic数据量较少或磁盘有效数据较少的情况下执行数据迁移操作
+* 进行分区迁移时最好先保留一个分区在原来的磁盘,这样不会影响正常的消费和生产
+  * 例如目的是将分区5(brober1,5)迁移到borker2,3,可以先将5迁移到2,1,最后再迁移到2,3
+  * 若是一次将1,5一次全部迁移到2,3,无法正常消费和生产,部分迁移则可以正常消费和生产
 
 
 
@@ -229,11 +285,26 @@ producer采用推(push)模式将消息发布到broker,每条消息都被追加(a
   }
   ```
 
-  
+
+
 
 ### 3.1.3 副本(Replication)
 
 同一个partition可能会有多个replication(对应 server.properties 配置中的 default.replication.factor=N).没有replication的情况下,一旦broker 宕机,其上所有 patition 的数据都不可被消费,同时producer也不能再将数据存于其上的patition.引入replication之后,同一个partition可能会有多个replication,而这时需要在这些replication之间选出一个leader,producer和consumer只与这个leader交互,其它replication作为follower从leader 中复制数据
+
+
+
+* 同步复制
+  * producer联系zk识别leader
+  * 向leader发送消息
+  * leadr收到消息写入到本地log
+  * follower从leader pull消息
+  * follower向本地写入log
+  * follower向leader发送ack消息
+  * leader收到所有follower的ack消息
+  * leader向producer回传ack
+* 异步复制
+  * 和同步复制的区别在与leader写入本地log之后,直接向client回传ack消息,不需要等待所有follower复制完成
 
 
 
@@ -246,6 +317,49 @@ producer写入消息流程如下:图解见PPT-3
 * leader将消息写入本地log
 * followers从leader pull消息,写入本地log后向leader发送ACK
 * leader收到所有ISR中的replication的ACK后,增加HW(high watermark,最后commit 的offset)并向producer发送ACK
+
+
+
+### 3.1.5 SegmentFile
+
+* 每个分区中有多个segmentfile,这些文件是实际存储数据的文件
+* 每个SegmentFile组成包括:offset,message,CRC32,magic,attributes,key length,key,value length,value
+
+| 字节长度             | 描述                                     |
+| :------------------- | ---------------------------------------- |
+| 8 byte offset        | 表示partiion的第多少message              |
+| 4 byte message size  | Message大小                              |
+| 4 byte CRC32         | CRC32校验                                |
+| 1 byte magic         | 本次发布Kafka服务程序协议版本号          |
+| 1 byte attributes    | 独立版本,或标识压缩类型,或编码类型       |
+| 4 byte key length    | key的长度,当key为-1时,K byte key字段不填 |
+| K byte key           | Key的内容,可选                           |
+| 4 bytes value length | 实际消息数据                             |
+| payload              | 实际的消息                               |
+
+* IndexFile:存储了所有的partition file的offset和文件编号的文件,能够使kafka快速查找数据
+
+
+
+### 3.1.6 同步生产者
+
+
+
+<img src="SyncProducer.png" />
+
+* 同步的向服务器发送RPC请求进行生产
+* 发送错误可以重试
+* 可以向客户端发送ack
+
+
+
+### 3.1.7 异步生产者
+
+![](AsyncProducer.png)
+
+* 最终也是通过向服务器发送RPC请求完成的(和同步发送模式一样)
+* 异步发送模式先将一定量消息放入队列中,待达到一定数量后再一起发送
+* 异步发送模式不支持发送ack,但是Client可以调用回调函数获取发送结果
 
 
 
@@ -269,7 +383,7 @@ producer写入消息流程如下:图解见PPT-3
 
 
 
-### 3.2.3 Zookeeper存储结构
+### 3.2.3 ZK存储结构
 
 ![](StoreStrcut.png)
 
@@ -277,7 +391,18 @@ producer写入消息流程如下:图解见PPT-3
 
 
 
-## 3.3 Kafka消费过程分析
+### 3.2.4 消息删除原理
+
+* 从最久的日志段开始删除,按日志段为单位进行删除,然后逐步向前推进,直到某个日志不满足条件
+* 删除条件
+  * 满足给定条件predicate,配置项log.retention.[ms,minutes,hours]和log.retention.bytes指定
+  * 不能是当前激活日志段
+  * 大小不能小于日志段的最小大小,配置项log.segment.bytes配置
+  * 要删除的是否是所有日志段,如果是则直接调用roll方法切分,因为kafka至少要保留一个日志段
+
+
+
+## 3.3 Kafka消费
 
 kafka提供了两套consumer API:高级Consumer API和低级Consumer API
 
@@ -325,7 +450,37 @@ kafka提供了两套consumer API:高级Consumer API和低级Consumer API
 
 
 
-### 3.3.5 消费者组案例
+### 3.3.5 分区和组消费
+
+* 分区消费模式直接由客户端(任何高级语言编写)使用Kafka提供的协议向服务器发送RPC请求获取数据,服务器接受到客户端的RPC请求后,将数据构造成RPC响应,返回给客户端,客户端解析相应的RPC响应获取数据
+
+<img src="PartitionConsumer.png" style="zoom: 25%;" />
+
+* Kafka支持的协议众多,使用比较重要的有
+  * 获取消息的FetchRequest和FetchResponse
+  * 获取offset的OffsetRequest和OffsetResponse
+  * 提交offset的OffsetCommitRequest和OffsetCommitResponse
+  * 获取Metadata的Metadata Request和Metadata Response
+  * 生产消息的ProducerRequest和ProducerResponse
+* 组消费模式
+
+<img src="GroupConsumer.png" style="zoom:50%;" />
+
+<img src="GroupConsumer1.png" style="zoom:50%;" />
+
+* 分区消费模式具有以下特点:
+  * 指定消费topic,partition和offset通过向服务器发送RPC请求进行消费
+  * 需要自己提交offset
+  * 需要自己处理各种错误,如:leader切换错误
+  * 需要自己处理消费者负载均衡策略
+* 组消费模式具有以下特点:
+  * 最终也是通过向服务器发送RPC请求完成的(和分区消费模式一样)
+  * 组消费模式由Kafka服务器端处理各种错误,然后将消息放入队列再封装为迭代器(队列为FetchedDataChunk对象) ,客户端只需在迭代器上迭代取出消息
+  * 由Kafka服务器端周期性的通过scheduler提交当前消费的offset,无需客户端负责
+
+
+
+### 3.3.6 消费者组案例
 
 需求:测试同一个消费者组中的消费者,同一时刻只能有一个消费者消费
 
