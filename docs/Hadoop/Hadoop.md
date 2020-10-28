@@ -79,6 +79,37 @@
 
 
 
+## Job
+
+* 任务名称
+* 任务作业
+
+
+
+## JobTracker
+
+* 项目经理.
+* JobTracker对应于NameNode
+* JobTracker是一个master服务,软件启动之后JobTracker接收Job,负责调度Job的每一个子任务
+* task运行于TaskTracker上,并监控它们,如果发现有失败的task就重新运行它
+
+
+
+## TaskTracker
+
+* 开发组长
+* TaskTracker对应于DataNode
+* TaskTracker是运行在多个节点上的slaver服务
+* TaskTracker主动与JobTracker通信,接收作业,并负责直接执行每一个任务
+
+
+
+## Child
+
+* 负责开发的人员
+
+
+
 # HDFS
 
 

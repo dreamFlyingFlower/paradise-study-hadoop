@@ -4,11 +4,11 @@
 
 # 概述
 
-* 类似于MR,运行在yarn上,在逻辑回归的特定算法上比hadoop快100倍上
+* 类似于MR,运行在yarn上,在逻辑回归的特定算法上比hadoop快100倍以上
 * 由Spark Core,Spark SQL,Spark Streaming,Spark MLLib,Spark GraphX组成其生态图
 * Spark Core:是其他Spark框架的核心,而Spark的核心是RDD(弹性分布式数据集)
-* Spark SQL:类似Hive使用SQL语句操作RDD DataFrame(表)
-* Spark Streaming:流式计算
+* Spark SQL:类似Hive,Pig,使用SQL语句操作RDD DataFrame(表)
+* Spark Streaming:流式计算,类似Storm的实时计算
 * Spark MLLib:Spark机器学习类库
 * Spark GraphX:图计算
 
@@ -49,6 +49,8 @@
 
 # 核心
 
+![](cluster-overview.png)
+
 * DataSets:
 * DataFrames:
 
@@ -56,7 +58,9 @@
 
 # 编译
 
-* 因为Spark中所用的Hadoop,Yarn等其他框架的版本可能会生产环境中的版本不一致,故而需要重新编译
+* Spark依赖的Hadoop,Yarn等其他框架版本可能会和生产环境中不一致,故而需要重新编译
+
+* 若忽略版本中的差异,可以直接使用官网压缩包解压即可
 
 * 进入Spark官网后选择需要使用的版本的源码下载
 
@@ -128,28 +132,77 @@
 
 * 官网[文档](http://spark.apache.org/docs/latest/spark-standalone.html)
 
-* 当不配置任何works时,可以直接启动sbin/start-master.sh,web页面可以从启动日志中查看masterui
+* 当不配置任何works时,可以直接启动sbin/start-master.sh
 
 * 配置文件在conf/spark-env.sh.template,改名为spark-env.sh
 
   ```shell
-  SPARK_MASTER_HOST=localhost # 主机名
-  SPARK_WORKER_CORES=2 # works核心工作数量
-  SPARK_WORKER_MEMORY=2g # 分配给work的总内存
+  export JAVA_HOME=/app/jdk1.8
+  export SPARK_MASTER_HOST=localhost # 主机名
+  # SPARK_WORKER_CORES=2 # works核心工作数量
+  # SPARK_WORKER_MEMORY=2g # 分配给work的总内存
   ```
 
-* 当含有work时,可以使用哦sbin/start-all.sh启动spark
+* 当含有work时,可以使用sbin/start-all.sh启动spark
+
+* web页面可以从启动日志中查看masterui,能够打开网址即部署成功
 
 
 
 ## 集群模式
 
 * 该模式下需要在master节点的conf/slaves中配置所有的work节点的主机名,只配置work的,不配置master
-* 启动:spark-shell --master spark://hadoop001:7077,该命令会启动master和所有的work
+* 启动:sbin/start-all.sh或spark-shell --master spark://master01:7077,master02:7077,该命令会启动master和所有的work
 * 若多次启动了master,则后启动的master在默认情况下是分配不到内存的
 * 若需要所有的master都可以运行,需要进行相关配置,详见官网文档
 
 
+
+## HA
+
+### 基于文件目录
+
+* 用于开发测试环境的单机环境
+
+* 将worker和application状态写入一个目录,如果出现崩溃,从该目录进行恢复
+
+* 在master上面进行配置如下:
+
+  * 创建一个恢复目录:spark/recovery
+  * 修改配置文件:spark-env.sh
+
+  ```shell
+  export SPARK_DAEMON_JAVA_OPTS="-Dspark.deploy.recoveryMode=FILESYSTEM -Dspark.deploy.recoveryDirectory=/app/spark/recovery"
+  ```
+
+
+
+### 基于ZooKeeper
+
+* 用于生产环境
+
+* 搭建zk集群,master节点为master01,master02,worker节点为worker01,worker02
+
+* 修改conf/spark-env.sh
+
+  ```shell
+  export JAVA_HOME=/opt/modules/jdk1.8.0_11
+  # spark.deploy.recoveryMode:设置为zk开启单点恢复功能,默认值为none
+  # spark.deploy.zookeeper.url:zk集群地址
+  # spark.deploy.zookeeper.dir:spark信息在zk中保存的目录
+  export SPARK_DAEMON_JAVA_OPTS="-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=master01:2181,master02:2181,master03:2181 -Dspark.deploy.zookeeper.dir=/spark"
+  ```
+
+* 修改conf/slaves
+
+  ```shell
+  worker01
+  worker02
+  ```
+
+* 启动集群:sbin/start-all.sh
+
+* 需要手动启动master02:sbin/start-master.sh
 
 
 
