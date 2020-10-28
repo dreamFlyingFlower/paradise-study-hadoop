@@ -5,29 +5,24 @@
 # 概念
 
 * 是一个分布式的,面向列的,可扩展的开源数据库,适用于非结构化数据的存储
-
+* 高可靠性:HBase非常稳定
+* 高性能:可以存储上亿或十亿级别的数据,可以实现毫秒级别的查询
+* 面向列:数据是按照列存储
+* 可伸缩:可以很方便的添加或删除一个节点
 * NameSpace:可以理解为关系型数据库的数据库
-
-* Table:必须是在文件路径中合法的名字,会映射在HDFS上的文件
-
+* Table:类似为数据库中的表.必须是在文件路径中合法的名字,会映射在HDFS上的文件
 * Row:在表里面,每行代表一个数据对象,每行都是一个行键(Row Key)进行唯一标识.行键可以是任何类型,在库中以字节存储
-
 * RowKey:唯一标识,类似于主键,不可更改,只能删除后重新插入
-
 * Column:列由Column family和Column qualifier组成,访问数据时用冒号(:)分割开
-
 * Column family(CF):类似传统数据库的字段名,又称为列簇.和传统字段不同的是,CF中存储的数据类似于键值对,而其中的键值就是ColumnQualifier(CQ或Key),可以有多个CQ.这就相当于CF下又有字段,而真正的值则是存储于CQ下.一个表中可以有多个CF,也可以只有一个CF,需要根据实际情况而定.例如:userinfo{"username":"ddd","email":"12@ali.com"},password{"pwd":"123456"}.其中userinfo就是一个CF,其中的username是CQ,ddd是值(CellValue).password是另外一个CF
-
 * Column qualifier:列簇中的数据通过列标识来进行映射,可以认为是key,如上个例子中的userinfo中的username,email
-
 * Cell:每一个行键(rowkey),CF和CQ共同组成一个单元,值可以是任意类型,以字节存储
-
 * Timestamp:每个值都会有一个timestamp,作为该值特定版本的标识符
 
   * 插入数据时若不指定该值,则默认为当前时间戳
   * 查询时若不指定时间戳,默认查询最新版本的值
   * Timestamp由HBase进行单独维护,默认只会维持3个版本的数据
-
+* HBase中的数据类型只有一种:byte[]
 * HBase与传统的关系型数据库的区别在于:
 
   * HBase处理的数据为PB级别,而传统数据库处理的一般是GB,TB数据
@@ -35,24 +30,32 @@
   * HBase只支持单行ROW的ACID
   * HBase只支持rowkey的索引
   * HBase的吞吐量是百万级别/每秒,传统数据库数千/每秒
-
 * HBase是基于HDFS系统进行数据存储,类似于Hive,但在Hadoop上提供了类似于Bigtable的能力
-
 * 适合于非结构化数据的存储,如图片等,适合用来进行大数据的实时查询
-
 * HBase提供了对数据的随机实时读写访问功能
-
 * HBase内部使用哈希表,并存储索引,可将在HDFS中的数据进行快速查找
-
 * HBase不适用于有join,多级索引,表关系复杂的数据模型
-
 * HBase由Java Api(提供查询),Hmaster,RegionServer和自带的zk组成
 
-  > RowKey			Timestamp					CF1								CF2
-  >
-  > ​														col1			col2					col1	col2
-  >
-  > rowkey1			timestamp1		value1		value2		value1		value2
+
+> RowKey	|		Timestamp		|			CF1				|				   CF2
+>
+> ​														 |col1	| 	col2		|			col1   |	 col2 |
+>
+> ----------------------------------------------------------------------------------------------------------------------------------
+>
+> rowkey1			timestamp1		value1		value2		value1		value2
+>
+> ​							timestamp2		value3		value4		value3		value4
+
+
+
+# 应用场景
+
+* 半结构化或非结构化数据:对于数据结构字段不够确定或杂乱无章很难按一个概念去进行抽取的数据适合用HBase.比如文章的tag信息,就会不断的增加,删除
+* 记录非常稀疏:RDBMS的行的列数是固定的,值为null的列浪费了存储空间.HBase为null的Column不会被存储,这样既节省了空间又提高了读性能
+* 多版本数据:Rowkey和Columnkey定位到的Value可以有任意数量的版本值,因此对于需要存储变动历史记录的数据,用HBase就非常方便了.业务上一般只需要最新的值,但有时可能需要查询到历史值
+* 超大数据量:当数据量越来越大,RDBMS数据库撑不住了,就出现了读写分离策略,通过一个Master专门负责写操作,多个Slave负责读操作,服务器成本倍增.随着压力增加,Master撑不住了,这时就要分库了,把关联不大的数据分开部署,一些join查询不能用了,需要借助中间层.随着数据量的进一步增加,一个表的记录越来越大,查询就变得很慢,于是又得搞分表,比如按ID取模分成多个表以减少单个表的记录数.采用HBase就简单了,只需要加机器即可,HBase会自动水平切分扩展,跟Hadoop的无缝集成保障了其数据可靠性(HDFS)和海量数据分析的高性能(MapReduce)
 
 
 
@@ -87,6 +90,8 @@
 * HMaster失效
   * 集群模式下,由zk中处于backup状态的其他HMaster节点推选一个转为Active状态
   * 非集群模式下,HMaster挂了,数据仍旧能正常读写,因为是由RegionServer来完成,但是不能创建删除表,也不能更改表结构
+
+![](System.png)
 
 
 
@@ -134,16 +139,21 @@
   * hfile.block.cache.size:regionserver的blockcache的内存大小限制
   * hbase.hregion.memstore.flush.size:mmestore超过该值将执行flush,默认128M
   * hbase.hregion.memstore.block.multiplier:若memstore的大小超过flush.size*multiplier,会阻塞该memstore的写操作
-
 * 常用优化:预先分区,rowkey优化,column优化,scheme优化
 * 预先分区:HBase在建表的时候默认只会在一个resionserver上建立一个region分区,可以在建表的时候预先创建一些空的region,根据rowkey来设定region的起始值和结束值,有目的的进行数据存储,减少region的split操作.同时可以将频繁访问的数据放在多个region中,将访问比较少的数据放在一个或几个region中,合理分配资源
 * rowkey优化:利用hbase默认排序特点,将一起访问的数据放在一起,也就是一个CF中;防止热点问题,避免使用时序或单调的递增递减等.热点就是在集群中,大量的请求访问单个或少量几个数据,大量的访问是的这些服务器超出自身的处理能力,从而导致整个集群的性能下降.尽量减少rowkey字节数,尽量短
+* rowkey必须唯一,如果不唯一,会被覆盖
+* rowkey必须订场,建议是8byte的倍数
+* rowkey是二进制字节流,理论长度不超过64k,越短越好,不超过100字节
+* rowkey散列原则:高位字段散列,可以化解写入时的数据倾斜,散列值只要保证在同时刻唯一即可
 * column优化:字段尽量短,一张表里的CF尽量不要超过3个
 * schema优化:
   * 宽表:列多行少,每行存储的数据多,事务更好,因为hbase只支持行事务,不支持其他类型事务
   * 高表:列少行多,每列存储的数据多,查询来说,高表更好.但是开销更大,因为rowkey更多,region更多
-
 * 写优化策略,同步提交或异步提交;WAL优化,是否必须,持久化等;Scan缓存设置,批量获取;BlockCache配置是否合理,HFile是否过多
+* HBase在HDFS中默认有2个目录:default和hbase,其中hbase存放系统表,default存放用户表
+  * hbase中的namespace表:存放所有的命名空间信息
+  * hbase中的meta表:存放数据库所有的region信息的rowkey范围
 
 
 
@@ -167,13 +177,19 @@
 
 * 启动:bin/start-hbase.sh
 
+* jps查看进程:HMaster,HRegionServer
+
+* 访问ip:16010
+
 
 
 ## 伪分布式
 
 * 在单机版基础上还需要增加其他[配置](http://abloz.com/hbase/book.html#hbase_default_configurations)
 
-* 复制hadoop的hdfs-site.xml和core-site.xml到hbase的conf文件夹下.
+* 集群依赖于Hadoop,所以要先将Hadoop的集群搭建成功
+
+* 复制hadoop的hdfs-site.xml和core-site.xml到hbase的conf文件夹下
 
 * 修改hbase-env.sh
 
@@ -190,22 +206,17 @@
 * 修改hbase-site.xml,在configuration标签添加如下:
 
   ```xml
-  <!-- 指定hbase的根目录,基于hadoop的ip:端口,加上自定义的文件夹名,会在hbase启动时自动在hadoop下创建 -->
+  <!-- 指定hbase的根目录,基于hadoop的ip:端口,加上自定义的目录名,会在hbase启动时自动在hadoop下创建 -->
   <property>
   	<name>hbase.rootdir</name>
   	<value>hdfs://localhost:9000/hbase</value>
-  </property>
-  <!-- 指定hbase自带的zookeeper的存储路径 -->
-  <property>
-  	<name>hbase.zookeeper.property.dataDir</name>
-  	<value>/app/hadoop/hadoop-2.9.1/zookeeper</value>
   </property>
   <!-- 指定hbase是否以集群的方式运行 -->
   <property>
   	<name>hbase.cluster.distributed</name>
   	<value>true</value>
   </property>
-  <!-- 若是hbase-env中的关于zk的配置为false时,需要配置以下参数,第1个是使用的zk的ip,第2个是zk的端口 -->
+  <!-- 若不使用自带的zk,需配置zk地址:第1个是zk的ip,第2个是zk的端口,多个用逗号隔开 -->
   <property>
   	<name>hbase.zookeeper.quorum</name>
   	<value>localhost</value>
@@ -213,6 +224,11 @@
   <property>
   	<name>hbase.zookeeper.property.clientPort</name>
   	<value>2181</value>
+  </property>
+  <!-- 指定zookeeper的存储路径 -->
+  <property>
+  	<name>hbase.zookeeper.property.dataDir</name>
+  	<value>/app/hadoop/hadoop-2.9.1/zookeeper</value>
   </property>
   <!-- memstore的内存刷新大小,默认128M,可以设置成256M,单位为字节 -->
   <property>
@@ -255,6 +271,9 @@
 * scan 'tablename':查看所有记录
 * scan 'tablename',{STARTROW=>'rowkey',LIMIT=>1,VERSIONS=>1};查询指定条数的记录
 * scan 'tablename',['cfname:key']:查看某个表某个列中所有数据
+* list_namespace:查看所有的命名空间,类似于MySQL中的数据库
+* list_namespace_tables 'tablename':查看命名空间中所有的表
+* create_namespace 'ns1':创建一个命名空间,行键rowkey是命名空间的名称
 
 
 
@@ -331,12 +350,12 @@
 	恢复数据:disable 'tablename';restore_snapshot 'tablename_bak'
 
 
+
 ## Replication
 
 * 可以通过replication机制实现hbase集群的主从模式,通过配置hbase-site.xml开始该功能
 
->
-	<property>
+><property>
 		<name>hbase.replication</name>
 		<value>true</value>
 	</property>
@@ -372,7 +391,7 @@
 
 
 
-## Phoenix安装
+## 安装
 
 * 下载tar包,解压到响应文件夹
 * 将解压后的文件夹中的phoenix-core-xx-hbase-xx.jar拷贝到每个hbase文件夹下的lib中,若是集群,每个hbase目录都要拷贝

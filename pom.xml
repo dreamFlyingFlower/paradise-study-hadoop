@@ -9,5 +9,6 @@
   	<module>paradise-study-hbase</module>
   	<module>paradise-study-hdfs</module>
   	<module>paradise-study-scala</module>
+  	<module>paradise-study-storm</module>
   </modules>
 </project>
