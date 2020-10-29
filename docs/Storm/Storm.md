@@ -44,6 +44,15 @@
 
 
 
+* 可靠的数据处理:Storm可以通过拓扑来确保每个发送的元组都能得到正确处理.通过跟踪由 Spout 发出的每个元组构成的元组树可以确定元组是否已经完成处理.每个拓扑都有一个“消息延时”参数,
+  如果 torm在延时时间内没有检测到元组是否处理完成,就会将该元组标记为处理失败,并会在稍后重新发送该元组
+* 为了充分利用Storm的可靠性机制,你必须在元组树创建新结点的时候以及元组处理完成的时候通知Storm.这个过程可以在Bolt发送元组时通过OutputCollector实现:在emit方法中实现元组的锚定(Anchoring),同时使用 ack 方法表明你已经完成了元组的处理
+* Storm的tuple锚定和应答确认机制中,当打开可靠传输的选项,传输到故障节点上的tuples将不会受到应答确认,spout会因为超时重新发射原始的tuple.这样的过程会一直重复直到Topology从故障中恢复开始正常处理数据
+* 在Storm集群中真正运行Topology的主要有三个实体:工作进程,线程和任务
+* Storm集群中的每台机器上都可以运行多个工作进程,每个工作进程又可创建多个线程,每个线程可以执行多个任务,任务是真正进行数据处理的实体,我们开发的spout,bolt就是作为一个或者多个任务的方式执行的.因此,计算任务在多个线程,进程和服务器之间并行进行,支持灵活的水平扩展
+
+
+
 ## 数据流模型
 
 ![](StormData.jpg)
@@ -91,14 +100,6 @@
 
 
 
-### 数据源的种类
-
-* Web或者移动程序的点击数据
-* 应用程序的日志数据
-* 传感器的输出
-
-
-
 ### Bolt
 
 * 业务逻辑运算节点
@@ -116,23 +117,24 @@
 
 
 
-### 数据流分组
+## 数据源
 
-* 数据流分组:Storm grouping,定义一个Topology中每个Bolt接受什么样的流作为输入
-* Storm定义了六种内置数据流分组的定义:
-  * 随机分组(Shuffle grouping):这种方式下元组会被尽可能随机地分配到 bolt 的不同任务(tasks)中,使得每个任务所处理元组数量能够能够保持基本一致,以确保集群的负载均衡
-  * 按字段分组(Fields grouping):这种方式下数据流根据定义的“字段”来进行分组.例如,如果某个数据流是基于一个名为“user-id”的字段进行分组的,那么所有包含相同的“user-id”的元组都会被分配到同一个task中,这样就可以确保消息处理的一致性
-  * 完全分组(All grouping):将所有的tuple复制后分发给所有的bolt task.每个订阅的task都会接收到tuple的拷贝,所有在使用此分组时需小心使用
-  * 全局分组(Global grouping):这种方式下所有的数据流都会被发送到 Bolt 的同一个任务中,也就是 id 最小的那个任务
-  * 不分组(NoneGrouping):不关心数据流如何分组.目前这种方式的结果与随机分组完全等效,不过未来 Storm 社区可能会考虑通过非分组方式来让Bolt和它所订阅的Spout或Bolt在同一个线程中执行
-  * 指向型分组(Direct grouping):数据源会调用emitDirect()方法来判断一个tuple应该由那个Storm组件来接收.只能在声明了是指向型的数据流上使用
+* Web或者移动程序的点击数据
+* 应用程序的日志数据
+* 传感器的输出
 
-* 可靠的数据处理:Storm可以通过拓扑来确保每个发送的元组都能得到正确处理.通过跟踪由 Spout 发出的每个元组构成的元组树可以确定元组是否已经完成处理.每个拓扑都有一个“消息延时”参数,
-  如果 torm在延时时间内没有检测到元组是否处理完成,就会将该元组标记为处理失败,并会在稍后重新发送该元组
-* 为了充分利用Storm的可靠性机制,你必须在元组树创建新结点的时候以及元组处理完成的时候通知Storm.这个过程可以在Bolt发送元组时通过OutputCollector实现:在emit方法中实现元组的锚定(Anchoring),同时使用 ack 方法表明你已经完成了元组的处理
-* Storm的tuple锚定和应答确认机制中,当打开可靠传输的选项,传输到故障节点上的tuples将不会受到应答确认,spout会因为超时重新发射原始的tuple.这样的过程会一直重复直到Topology从故障中恢复开始正常处理数据
-* 在Storm集群中真正运行Topology的主要有三个实体:工作进程,线程和任务
-* Storm集群中的每台机器上都可以运行多个工作进程,每个工作进程又可创建多个线程,每个线程可以执行多个任务,任务是真正进行数据处理的实体,我们开发的spout,bolt就是作为一个或者多个任务的方式执行的.因此,计算任务在多个线程,进程和服务器之间并行进行,支持灵活的水平扩展
+
+
+## 分组策略
+
+* 数据流分组:Storm grouping,定义Stream如何分配给Bolts上面的多个Executors(多线程,多并发)
+* 随机分组(Shuffle grouping):轮训,随机分配,平均分配.这种方式下元组会被随机地分配到bolt的不同任务(tasks)中,使每个任务所处理元组数量能够保持基本一致,以确保集群的负载均衡
+* 按字段分组(Fields grouping):数据流根据定义的字段分组.例如,某个数据流是基于userId字段进行分组,那么所有包含相同userId的元组都会被分配到同一个task中,这样可以确保消息处理的一致性
+* 广播发送(All grouping):将Tuple复制后分发给所有的Task,每个订阅的Task都会接收到Tuple
+* 全局分组(Global grouping):所有数据流都会发送到Bolt的同一个Task中,也就是id最小的那个Task
+* 不分组(NoneGrouping):不关心数据流如何分组.目前这种方式的结果与随机分组完全等效,不过未来Storm社区可能会考虑通过该分组方式来让Bolt和它所订阅的Spout或Bolt在同一个线程中执行
+* 指向型分组(Direct grouping):指定Tuple应该由那个Task处理.只有被声明为DirectStream的消息流可以使用该分组,而且这种消息Tuple必须使用emitDirect方法来发射.消息处理者可以通过TopologyContext来获取处理它的消息的task的id(OutputCollector.emit方法也会返回task的id)
+* Local or shuffle grouping:如果目标Bolt有一个或者多个task在同一个工作进程中,Tuple将会被随机发送给这些tasks,否则,和普通的Shuffle Grouping行为一致
 
 
 
@@ -141,23 +143,62 @@
 ![](StormRun.png)
 
 * 见Storm.pptx-02
-
 * Storm集群由一个主节点(Nimbus)和一个或者多个工作节点(Supervisor)组成
 * Nimbus分配任务,zk监督执行(心跳监控,worker,supurvisor的心跳都归它管),supervisor下载代码,创建worker和线程等,worker,executor就干活,task就是具体要干的活
-* Nimbus:Storm主节点,类似于Hadoop中的jobtracker,管理,协调和监控在集群上运行的Topology.包括Topology的发布,事件处理失败时重新指派任务
-* Supervisor:每个工作节点运行一个Supervisor守护进程
-  * 负责监听工作节点上已经分配的主机作业,启动和停止Nimbus已经分配的工作进程
-  * 定时从ZK获取拓补信息topologies,任务分配信息assignments及各类心跳信息,以此为依据进行任务分配
-  * Supervisor同步时,会根据任务分配情况启动新worker或者关闭旧worker并进行负载均衡
-  * 一个Storm集群可以包含一个或者多个supervisor
-* Zookeeper:Storm主要使用ZK来协调集群中的状态信息,比如任务的分配情况,Worker的状态,supervisor之间的nimbus的拓扑质量.nimbus和supervisor节点的通信主要是结合zookeeper的状态变更通知和监控通知来处理的
-* Worker:一个Supervisor上相互独立运行的JVM进程,包含一个或多个线程
-  * 具体处理Spout/Bolt逻辑的进程,根据提交的拓扑中conf.setNumWorkers()方法定义分配每个拓扑对应的worker数量,Storm会在每个Worker上均匀分配任务,一个Worker只能执行一个Topology的任务子集.worker进程会占用固定的可由配置进行修改的内存空间(默认768M)
-  * 每个supervisor可以配置一个或多个worker,由配置文件storm.yaml中的supervisor.slots.ports控制
-  * 一个supervisor配置了几个端口,其可运行的最大worker数就是几.一个topology会被分配在一个或多个worker上运行
-* Executor:指一个worker在JVM中运行时开启的Java线程.多个task可以指派给同一个executer来执行,除非明确指定,Storm默认给每个executor分配一个task
-* Task:可以简单的理解为spout或bolt的实例,它们的nextTuple和execute方法会被executors执行
+
+
+
+### Nimbus
+
+* Storm主节点,类似于Hadoop中的jobtracker,管理,协调和监控在集群上运行的Topology.包括Topology的发布,事件处理失败时重新指派任务
+
+
+
+### Supervisor
+
+* 每个工作节点运行一个Supervisor守护进程
+* 负责监听工作节点上已经分配的主机作业,启动和停止Nimbus已经分配的工作进程
+* 定时从ZK获取拓补信息topologies,任务分配信息assignments及各类心跳信息,以此为依据进行任务分配
+* Supervisor同步时,会根据任务分配情况启动新worker或者关闭旧worker并进行负载均衡
+* 一个Storm集群可以包含一个或者多个supervisor
+
+
+
+### Zookeeper
+
+* Storm主要使用ZK来协调集群中的状态信息,比如任务的分配情况,Worker的状态,supervisor之间的nimbus的拓扑质量.nimbus和supervisor节点的通信主要是结合zookeeper的状态变更通知和监控通知来处理的
+
+
+
+### Worker
+
+* 一个Supervisor上相互独立运行的JVM进程,包含一个或多个线程
+* 具体处理Spout/Bolt逻辑的进程,根据提交的拓扑中conf.setNumWorkers()方法定义分配每个拓扑对应的worker数量,Storm会在每个Worker上均匀分配任务,一个Worker只能执行一个Topology的任务子集.worker进程会占用固定的可由配置进行修改的内存空间(默认768M)
+* 每个supervisor可以配置一个或多个worker,由配置文件的supervisor.slots.ports控制
+* 一个supervisor配置了几个端口,其可运行的最大worker数就是几
+* 一个topology会被分配在一个或多个worker上运行
+* 默认情况下一个Worker对应一个Ack线程
+
+
+
+### Executor
+
+* 指一个worker在JVM中运行时开启的Java线程.多个task可以指派给同一个executer来执行,除非明确指定,Storm默认给每个executor分配一个task
+
+
+
+### Task
+
+* 可以简单的理解为spout或bolt的实例,它们的nextTuple和execute方法会被executors执行
 * 常见实时流式计算架构图:后台系统->Flume集群->Kafka集群->Storm集群->Redis集群
+
+
+
+## 并发度
+
+* 用户指定一个任务,可以被多个线程执行,并发度的数量等于线程executor的数量
+* Task就是具体的处理逻辑对象,一个executor线程可以执行一个或多个tasks,但一般默认每个executor只执行一个task,所以我们往往认为task就是执行线程,其实不是
+* Task代表最大并发度,一个component的task数是不会改变的,但是一个componet的executer数目是会发生变化的(Storm Rebalance命令),task数>=executor数,executor数代表实际并发数
 
 
 
@@ -246,111 +287,119 @@ storm supervisor &
 
 # 日志查看
 
-查看nimbus的日志信息
+* 查看nimbus的日志信息,在nimbus的服务器上
 
-在nimbus的服务器上
+```shell
+tail -100f storm/logs/nimbus.log
+```
 
-cd /opt/module/storm/logs
+* 查看ui运行日志信息,在ui的服务器上,一般和nimbus一个服务器
 
-tail -100f /opt/module/storm/logs/nimbus.log
+```shell
+tail -100f storm/logs/ui.log
+```
 
-2）查看ui运行日志信息
+* 查看supervisor运行日志信息,在supervisor服务上
 
-在ui的服务器上，一般和nimbus一个服务器
+```shell
+tail -100f storm/logs/supervisor.log
+```
 
-cd /opt/module/storm/logs
+* 查看supervisor上worker运行日志信息,在supervisor服务上
 
-tail -100f /opt/module/storm/logs/ui.log
+```shell
+tail -100f 	torm/logs/worker-6702.log
+```
 
-3）查看supervisor运行日志信息
+* logviewer,可以在web页面点击相应的端口号即可查看日志,分别在supervisor节点上执行:
 
-在supervisor服务上
-
-cd /opt/module/storm/logs
-
-tail -100f /opt/module/storm/logs/supervisor.log
-
-4）查看supervisor上worker运行日志信息
-
-在supervisor服务上
-
-cd /opt/module/storm/logs
-
-tail -100f /opt/module/storm/logs/worker-6702.log
-
-5）logviewer，可以在web页面点击相应的端口号即可查看日志
-
-分别在supervisor节点上执行：
-
-[atguigu@hadoop102 storm]$ bin/storm logviewer &
-
-[atguigu@hadoop103 storm]$ bin/storm logviewer &
-
-[atguigu@hadoop104 storm]$ bin/storm logviewer &
+```shell
+# 每个节点上执行
+bin/storm logviewer &
+```
 
 
 
+# Storm Shell
 
-
-### Storm命令行操作
-
-1）nimbus：启动nimbus守护进程
-
-​    storm nimbus
-
-2）supervisor：启动supervisor守护进程
-
-​    storm supervisor
-
-3）ui：启动UI守护进程。
-
-​    storm ui
-
-4）list：列出正在运行的拓扑及其状态
-
-​    storm list
-
-5）logviewer：Logviewer提供一个web接口查看Storm日志文件。
-
-​    storm logviewer
-
-6）jar：
-
-storm jar 【jar路径】 【拓扑包名.拓扑类名】 【拓扑名称】
-
-7）kill：杀死名为Topology-name的拓扑
-
-​    storm kill topology-name [-w wait-time-secs]
-
-​    -w：等待多久后杀死拓扑
-
-8）active：激活指定的拓扑spout。
-
-storm activate topology-name
-
-9）deactivate：禁用指定的拓扑Spout。
-
-​    storm deactivate topology-name 
-
-10）help：打印一条帮助消息或者可用命令的列表。
-
-​    storm help
-
-​    storm help <command>
+* storm nimbus:在nimbus节点上,启动nimbus守护进程
+* storm supervisor:启动supervisor守护进程
+* storm ui:启动UI守护进程
+* storm list:列出正在运行的拓扑及其状态
+* storm logviewer:Logviewer提供一个web接口查看Storm日志文件
+* storm jar  jar路径  拓扑包名.拓扑类名  拓扑名称:启动某个jar
+* storm kill topology-name [-w wait-time-secs]:结束名为Topology-name的拓扑
+  * -w:等待多久后杀死拓扑
+* storm activate topology-name:激活指定的拓扑Spout
+* storm deactivate topology-name:禁用指定的拓扑Spout
+* storm help [command]:打印一条帮助消息或者可用命令的列表
 
 
 
-# 本地模式
-
-> 即Topology(相当于一个任务)运行在本地机器的单一JVM上,这个模式主要用来开发,调试
+# Java Api
 
 
 
-# 远程模式
+## 基本接口
 
-> 把Topology提交到集群,该模式中,Storm的所有组件都是线程安全的
+* IComponent接口
+* ISpout接口
+* IRichSpout接口
+* IStateSpout接口
+* IRichStateSpout接口
+* IBolt接口
+* IRichBolt接口
+* IBasicBolt接口
 
 
+
+## 基本抽象类
+
+* BaseComponent抽象类
+* BaseRichSpout抽象类
+* BaseRichBolt抽象类
+* BaseTransactionalBolt抽象类
+* BaseBasicBolt抽象类
+
+
+
+## Spout水龙头
+
+* Spout的最顶层抽象是ISpout接口
+* open:是初始化方法,只会调用一次
+* close:在该spout关闭前执行,但是并不能得到保证其一定被执行,kill -9时不执行,Storm kill {topoName} 时执行
+* activate:当Spout已经从失效模式中激活时被调用,该Spout的nextTuple()方法很快就会被调用
+* deactivate:当Spout已经失效时被调用.在Spout失效期间,nextTuple不会被调用,Spout将来可能会也可能不会被重新激活
+* nextTuple:该方法是会一直被调用.调用该方法时,Storm要求Spout发射(emit)元组到输出收集器OutputCollecctor.该方法应该是非阻塞的,所以,如果Spout没有元组可以发射,该方法应该返回.
+* nextTuple,ack和fail方法都在Spout任务的单一线程内紧密循环被调用.当没有元组可以发射时,可以让nextTuple去sleep很短的时间,例如1毫秒,这样就不会浪费太多的CPU资源
+* ack:成功处理tuple回调方法
+* fail:理失败tuple回调方法
+* 通常情况下(Shell和事务型的除外),实现一个Spout,可以直接实现接口IRichSpout,如果不想写多余的代码,可以直接继承BaseRichSpout
+
+
+
+## Bolt转接头
+
+* Bolt的最顶层抽象是IBolt接口
+* prepare:prepare方法在集群的工作进程内被初始化时被调用,提供了Bolt执行所需要的环境
+* execute:该方法会一直被调用.接受一个tuple进行处理,也可emit数据到下一级组件
+* cleanup:Cleanup方法当一个IBolt即将关闭时被调用,不能保证cleanup()方法一定会被调用
+  * 因为Supervisor可以对集群的工作进程使用kill -9命令强制杀死进程命令,此时不被调用
+  * 如果在本地模式下运行Storm,当拓扑被杀死的时候,可以保证cleanup()方法一定会被调用
+* 实现一个Bolt,可以实现IRichBolt或继承BaseRichBolt,如果不想处理结果反馈,可以实现IBasicBolt接口或继承BaseBasicBolt,相当于自动做了prepare方法和collector.emit.ack(inputTuple)
+
+
+
+## Spout的tail特性
+
+* Storm可以实时监测文件数据,当文件数据变化时,Storm自动读取
+
+
+
+# 运行模式
+
+* 本地模式:即Topology(相当于一个任务)运行在本地机器的单一JVM上,这个模式主要用来开发,调试
+* 远程模式:Topology提交到集群,该模式中,Storm的所有组件都是线程安全的
 
 * 本地模式和远程模式只是在Topology的运行主类的代码上有所差别
   * 远程模式:集群提交方法,StormSubmitter.submitTopology
@@ -366,3 +415,5 @@ storm jar wordcount.jar com.wy.wordcount.cluster.WordCountTopology wordcount
 ```
 
   
+
+# DRPC
