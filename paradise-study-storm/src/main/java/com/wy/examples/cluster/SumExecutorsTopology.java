@@ -1,4 +1,4 @@
-package com.wy.examples;
+package com.wy.examples.cluster;
 
 import java.util.Map;
 
@@ -23,7 +23,7 @@ import org.apache.storm.utils.Utils;
  * @date 2020-10-29 14:35:21
  * @git {@link https://github.com/mygodness100}
  */
-public class ClusterSumStormExecutorsTopology {
+public class SumExecutorsTopology {
 
 	/**
 	 * Spout需要继承BaseRichSpout 数据源需要产生数据并发射
@@ -116,7 +116,7 @@ public class ClusterSumStormExecutorsTopology {
 		builder.setSpout("DataSourceSpout", new DataSourceSpout(), 2);
 		builder.setBolt("SumBolt", new SumBolt(), 2).shuffleGrouping("DataSourceSpout");
 		// 代码提交到Storm集群上运行
-		String topoName = ClusterSumStormExecutorsTopology.class.getSimpleName();
+		String topoName = SumExecutorsTopology.class.getSimpleName();
 		try {
 			Config config = new Config();
 			config.setNumWorkers(2);

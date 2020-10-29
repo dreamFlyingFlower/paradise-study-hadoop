@@ -1,4 +1,4 @@
-package com.wy.examples;
+package com.wy.examples.cluster;
 
 import java.util.Map;
 
@@ -20,17 +20,17 @@ import org.apache.storm.utils.Utils;
  * 使用Storm实现积累求和的操作
  * 
  * @author ParadiseWY
- * @date 2020-10-29 14:37:06
+ * @date 2020-10-29 14:36:11
  * @git {@link https://github.com/mygodness100}
  */
-public class ClusterSumStormTopology {
+public class SumTasksTopology {
 
 	/**
 	 * Spout需要继承BaseRichSpout 数据源需要产生数据并发射
 	 */
 	public static class DataSourceSpout extends BaseRichSpout {
 
-		private static final long serialVersionUID = 483084836426706903L;
+		private static final long serialVersionUID = -4112387667833144108L;
 
 		private SpoutOutputCollector collector;
 
@@ -56,6 +56,7 @@ public class ClusterSumStormTopology {
 		public void nextTuple() {
 			this.collector.emit(new Values(++number));
 			System.out.println("Spout: " + number);
+			// 防止数据产生太快
 			Utils.sleep(1000);
 		}
 
@@ -74,7 +75,7 @@ public class ClusterSumStormTopology {
 	 */
 	public static class SumBolt extends BaseRichBolt {
 
-		private static final long serialVersionUID = 6150714309321544222L;
+		private static final long serialVersionUID = 1553012861439190882L;
 
 		int sum = 0;
 
@@ -112,12 +113,15 @@ public class ClusterSumStormTopology {
 		// Storm中任何一个作业都是通过Topology的方式进行提交的
 		// Topology中需要指定Spout和Bolt的执行顺序
 		TopologyBuilder builder = new TopologyBuilder();
-		builder.setSpout("DataSourceSpout", new DataSourceSpout());
-		builder.setBolt("SumBolt", new SumBolt()).shuffleGrouping("DataSourceSpout");
+		builder.setSpout("DataSourceSpout", new DataSourceSpout(), 2);
+		builder.setBolt("SumBolt", new SumBolt(), 2).setNumTasks(4).shuffleGrouping("DataSourceSpout");
 		// 代码提交到Storm集群上运行
-		String topoName = ClusterSumStormTopology.class.getSimpleName();
+		String topoName = SumTasksTopology.class.getSimpleName();
 		try {
-			StormSubmitter.submitTopology(topoName, new Config(), builder.createTopology());
+			Config config = new Config();
+			config.setNumWorkers(2);
+			config.setNumAckers(0);
+			StormSubmitter.submitTopology(topoName, config, builder.createTopology());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

@@ -1,4 +1,6 @@
-package com.wy.examples;
+package com.wy.examples.cluster;
+
+import java.util.Map;
 
 import org.apache.storm.Config;
 import org.apache.storm.StormSubmitter;
@@ -14,23 +16,21 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 
-import java.util.Map;
-
 /**
  * 使用Storm实现积累求和的操作
  * 
  * @author ParadiseWY
- * @date 2020-10-29 15:07:45
+ * @date 2020-10-29 14:37:06
  * @git {@link https://github.com/mygodness100}
  */
-public class ClusterSumFieldGroupingStormTopology {
+public class SumTopology {
 
 	/**
 	 * Spout需要继承BaseRichSpout 数据源需要产生数据并发射
 	 */
 	public static class DataSourceSpout extends BaseRichSpout {
 
-		private static final long serialVersionUID = -8336415429254949994L;
+		private static final long serialVersionUID = 483084836426706903L;
 
 		private SpoutOutputCollector collector;
 
@@ -54,9 +54,8 @@ public class ClusterSumFieldGroupingStormTopology {
 		 * 这个方法是一个死循环，会一直不停的执行
 		 */
 		public void nextTuple() {
-			this.collector.emit(new Values(number % 2, ++number));
+			this.collector.emit(new Values(++number));
 			System.out.println("Spout: " + number);
-			// 防止数据产生太快
 			Utils.sleep(1000);
 		}
 
@@ -66,7 +65,7 @@ public class ClusterSumFieldGroupingStormTopology {
 		 * @param declarer
 		 */
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
-			declarer.declare(new Fields("flag", "num"));
+			declarer.declare(new Fields("num"));
 		}
 	}
 
@@ -75,7 +74,7 @@ public class ClusterSumFieldGroupingStormTopology {
 	 */
 	public static class SumBolt extends BaseRichBolt {
 
-		private static final long serialVersionUID = 4816879333919746592L;
+		private static final long serialVersionUID = 6150714309321544222L;
 
 		int sum = 0;
 
@@ -88,6 +87,7 @@ public class ClusterSumFieldGroupingStormTopology {
 		 */
 		public void prepare(@SuppressWarnings("rawtypes") Map stormConf, TopologyContext context,
 				OutputCollector collector) {
+
 		}
 
 		/**
@@ -100,7 +100,6 @@ public class ClusterSumFieldGroupingStormTopology {
 			Integer value = input.getIntegerByField("num");
 			sum += value;
 			System.out.println("Bolt: sum = [" + sum + "]");
-			System.out.println("Thread id: " + Thread.currentThread().getId() + " , rece data is : " + value);
 		}
 
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
@@ -114,9 +113,9 @@ public class ClusterSumFieldGroupingStormTopology {
 		// Topology中需要指定Spout和Bolt的执行顺序
 		TopologyBuilder builder = new TopologyBuilder();
 		builder.setSpout("DataSourceSpout", new DataSourceSpout());
-		builder.setBolt("SumBolt", new SumBolt(), 3).fieldsGrouping("DataSourceSpout", new Fields("flag"));
+		builder.setBolt("SumBolt", new SumBolt()).shuffleGrouping("DataSourceSpout");
 		// 代码提交到Storm集群上运行
-		String topoName = ClusterSumFieldGroupingStormTopology.class.getSimpleName();
+		String topoName = SumTopology.class.getSimpleName();
 		try {
 			StormSubmitter.submitTopology(topoName, new Config(), builder.createTopology());
 		} catch (Exception e) {

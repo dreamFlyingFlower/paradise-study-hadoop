@@ -1,4 +1,4 @@
-package com.wy.examples;
+package com.wy.examples.cluster;
 
 import java.util.Map;
 
@@ -20,17 +20,17 @@ import org.apache.storm.utils.Utils;
  * 使用Storm实现积累求和的操作
  * 
  * @author ParadiseWY
- * @date 2020-10-29 14:36:11
+ * @date 2020-10-29 14:30:42
  * @git {@link https://github.com/mygodness100}
  */
-public class ClusterSumStormTasksTopology {
+public class SumAllGroupingTopology {
 
 	/**
 	 * Spout需要继承BaseRichSpout 数据源需要产生数据并发射
 	 */
 	public static class DataSourceSpout extends BaseRichSpout {
 
-		private static final long serialVersionUID = -4112387667833144108L;
+		private static final long serialVersionUID = 1L;
 
 		private SpoutOutputCollector collector;
 
@@ -75,7 +75,7 @@ public class ClusterSumStormTasksTopology {
 	 */
 	public static class SumBolt extends BaseRichBolt {
 
-		private static final long serialVersionUID = 1553012861439190882L;
+		private static final long serialVersionUID = -6898124212548305465L;
 
 		int sum = 0;
 
@@ -88,7 +88,6 @@ public class ClusterSumStormTasksTopology {
 		 */
 		public void prepare(@SuppressWarnings("rawtypes") Map stormConf, TopologyContext context,
 				OutputCollector collector) {
-
 		}
 
 		/**
@@ -101,10 +100,10 @@ public class ClusterSumStormTasksTopology {
 			Integer value = input.getIntegerByField("num");
 			sum += value;
 			System.out.println("Bolt: sum = [" + sum + "]");
+			System.out.println("Thread id: " + Thread.currentThread().getId() + " , rece data is : " + value);
 		}
 
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
-
 		}
 	}
 
@@ -113,15 +112,12 @@ public class ClusterSumStormTasksTopology {
 		// Storm中任何一个作业都是通过Topology的方式进行提交的
 		// Topology中需要指定Spout和Bolt的执行顺序
 		TopologyBuilder builder = new TopologyBuilder();
-		builder.setSpout("DataSourceSpout", new DataSourceSpout(), 2);
-		builder.setBolt("SumBolt", new SumBolt(), 2).setNumTasks(4).shuffleGrouping("DataSourceSpout");
+		builder.setSpout("DataSourceSpout", new DataSourceSpout());
+		builder.setBolt("SumBolt", new SumBolt(), 3).allGrouping("DataSourceSpout");
 		// 代码提交到Storm集群上运行
-		String topoName = ClusterSumStormTasksTopology.class.getSimpleName();
+		String topoName = SumAllGroupingTopology.class.getSimpleName();
 		try {
-			Config config = new Config();
-			config.setNumWorkers(2);
-			config.setNumAckers(0);
-			StormSubmitter.submitTopology(topoName, config, builder.createTopology());
+			StormSubmitter.submitTopology(topoName, new Config(), builder.createTopology());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

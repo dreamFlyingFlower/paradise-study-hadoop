@@ -1,4 +1,4 @@
-package com.wy.examples;
+package com.wy.examples.cluster;
 
 import java.util.Map;
 
@@ -23,7 +23,7 @@ import org.apache.storm.utils.Utils;
  * @date 2020-10-29 15:07:51
  * @git {@link https://github.com/mygodness100}
  */
-public class ClusterSumShuffleGroupingStormTopology {
+public class SumShuffleGroupingTopology {
 
 	/**
 	 * Spout需要继承BaseRichSpout 数据源需要产生数据并发射
@@ -117,7 +117,7 @@ public class ClusterSumShuffleGroupingStormTopology {
 		builder.setSpout("DataSourceSpout", new DataSourceSpout());
 		builder.setBolt("SumBolt", new SumBolt(), 3).shuffleGrouping("DataSourceSpout");
 		// 代码提交到Storm集群上运行
-		String topoName = ClusterSumShuffleGroupingStormTopology.class.getSimpleName();
+		String topoName = SumShuffleGroupingTopology.class.getSimpleName();
 		try {
 			StormSubmitter.submitTopology(topoName, new Config(), builder.createTopology());
 		} catch (Exception e) {

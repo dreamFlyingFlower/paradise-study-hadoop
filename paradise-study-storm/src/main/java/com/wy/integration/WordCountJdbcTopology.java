@@ -1,17 +1,17 @@
-package com.wy.examples;
+package com.wy.integration;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Random;
 
 import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
-import org.apache.storm.shade.org.apache.commons.io.FileUtils;
+import org.apache.storm.jdbc.bolt.JdbcInsertBolt;
+import org.apache.storm.jdbc.common.ConnectionProvider;
+import org.apache.storm.jdbc.common.HikariCPConnectionProvider;
+import org.apache.storm.jdbc.mapper.JdbcMapper;
+import org.apache.storm.jdbc.mapper.SimpleJdbcMapper;
+import org.apache.storm.shade.com.google.common.collect.Maps;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -22,19 +22,24 @@ import org.apache.storm.topology.base.BaseRichSpout;
 import org.apache.storm.tuple.Fields;
 import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
+import org.apache.storm.utils.Utils;
 
 /**
- * 使用Storm完成词频统计功能
+ * 本地模式使用Storm整合jdbc完成词频统计功能
+ * 
+ * 官方文档:http://storm.apache.org/releases/1.2.3/storm-jdbc.html
  * 
  * @author ParadiseWY
  * @date 2020-10-29 14:43:03
  * @git {@link https://github.com/mygodness100}
  */
-public class LocalWordCountStormTopology {
+public class WordCountJdbcTopology {
 
 	public static class DataSourceSpout extends BaseRichSpout {
 
 		private static final long serialVersionUID = 1080417784433980983L;
+
+		public static final String[] WORDS = new String[] { "apple", "orange", "banana", "purple" };
 
 		private SpoutOutputCollector collector;
 
@@ -43,30 +48,11 @@ public class LocalWordCountStormTopology {
 			this.collector = collector;
 		}
 
-		/**
-		 * 业务:<br>
-		 * 1. 读取指定目录的文件夹下的数据:/Users/rocky/data/storm/wc<br>
-		 * 2:把每一行数据发射出去
-		 */
 		public void nextTuple() {
-			// 获取所有文件
-			Collection<File> files = FileUtils.listFiles(new File("/Users/rocky/data/storm/wc"), new String[] { "txt" },
-					true);
-			for (File file : files) {
-				try {
-					// 获取文件中的所有内容
-					List<String> lines = FileUtils.readLines(file, StandardCharsets.UTF_8);
-					// 获取文件中的每行的内容
-					for (String line : lines) {
-						// 发射出去
-						this.collector.emit(new Values(line));
-					}
-					// 数据处理完之后,改名,否则一直重复执行
-					FileUtils.moveFile(file, new File(file.getAbsolutePath() + System.currentTimeMillis()));
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
+			Random random = new Random(WORDS.length);
+			String word = WORDS[random.nextInt()];
+			this.collector.emit(new Values(word));
+			Utils.sleep(1000);
 		}
 
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
@@ -89,14 +75,11 @@ public class LocalWordCountStormTopology {
 		}
 
 		/**
-		 * 业务逻辑： line： 对line进行分割，按照逗号
+		 * 业务逻辑,从Spout中取出emit的line资源
 		 */
 		public void execute(Tuple input) {
-			String line = input.getStringByField("line");
-			String[] words = line.split(",");
-			for (String word : words) {
-				this.collector.emit(new Values(word));
-			}
+			String word = input.getStringByField("line");
+			this.collector.emit(new Values(word));
 		}
 
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
@@ -111,15 +94,17 @@ public class LocalWordCountStormTopology {
 
 		private static final long serialVersionUID = 7525401744245627728L;
 
+		private OutputCollector collector;
+
 		public void prepare(@SuppressWarnings("rawtypes") Map stormConf, TopologyContext context,
 				OutputCollector collector) {
-
+			this.collector = collector;
 		}
 
 		Map<String, Integer> map = new HashMap<String, Integer>();
 
 		/**
-		 * 业务逻辑： 1）获取每个单词 2）对所有单词进行汇总 3）输出
+		 * 业务逻辑:1.获取每个单词;2.对所有单词进行汇总;3输出
 		 */
 		public void execute(Tuple input) {
 			// 1.）获取每个单词
@@ -132,15 +117,11 @@ public class LocalWordCountStormTopology {
 			// 2.对所有单词进行汇总
 			map.put(word, count);
 			// 3.输出
-			System.out.println("~~~~~~~~~~~~~~~~~~~~~~");
-			Set<Map.Entry<String, Integer>> entrySet = map.entrySet();
-			for (Map.Entry<String, Integer> entry : entrySet) {
-				System.out.println(entry);
-			}
+			collector.emit(new Values(word, map.get(word)));
 		}
 
 		public void declareOutputFields(OutputFieldsDeclarer declarer) {
-
+			declarer.declare(new Fields("word", "count"));
 		}
 	}
 
@@ -148,10 +129,34 @@ public class LocalWordCountStormTopology {
 		// 通过TopologyBuilder根据Spout和Bolt构建Topology
 		TopologyBuilder builder = new TopologyBuilder();
 		builder.setSpout("DataSourceSpout", new DataSourceSpout());
+		// 获得Spout弹射的数据源,通过id->DataSourceSpout
 		builder.setBolt("SplitBolt", new SplitBolt()).shuffleGrouping("DataSourceSpout");
+		// 获得SplitBolt弹射的数据源
 		builder.setBolt("CountBolt", new CountBolt()).shuffleGrouping("SplitBolt");
+		// HikariCPConnectionProvider是Storm已经实现好的类,若想自定义连接,需要实现{@link
+		// ConnectionProvider}
+		Map<String, Object> hikariConfigMap = Maps.newHashMap();
+		// 数据库连接
+		hikariConfigMap.put("dataSourceClassName", "com.mysql.jdbc.jdbc2.optional.MysqlDataSource");
+		hikariConfigMap.put("dataSource.url", "jdbc:mysql://localhost/test");
+		hikariConfigMap.put("dataSource.user", "root");
+		hikariConfigMap.put("dataSource.password", "password");
+		ConnectionProvider connectionProvider = new HikariCPConnectionProvider(hikariConfigMap);
+
+		String tableName = "user_details";
+		JdbcMapper simpleJdbcMapper = new SimpleJdbcMapper(tableName, connectionProvider);
+		// 从数据库中查询数据
+		// JdbcInsertBolt userPersistanceBolt = new JdbcInsertBolt(connectionProvider,
+		// simpleJdbcMapper)
+		// .withTableName("user")
+		// .withQueryTimeoutSecs(30);
+		// 往数据库中插入数据
+		JdbcInsertBolt userPersistanceBolt = new JdbcInsertBolt(connectionProvider, simpleJdbcMapper)
+				.withInsertQuery("insert into user values (?,?)").withQueryTimeoutSecs(30);
+		// 从CountBolt中获得的字段个数和字段名要和数据库表中的个数和字段名相同
+		builder.setBolt("JdbcStoreBolt", userPersistanceBolt).shuffleGrouping("CountBolt");
 		// 创建本地集群
 		LocalCluster cluster = new LocalCluster();
-		cluster.submitTopology("LocalWordCountStormTopology", new Config(), builder.createTopology());
+		cluster.submitTopology("LocalWordCountRedisTopology", new Config(), builder.createTopology());
 	}
 }

@@ -1,9 +1,7 @@
-package com.wy.examples;
-
-import java.util.Map;
+package com.wy.examples.cluster;
 
 import org.apache.storm.Config;
-import org.apache.storm.LocalCluster;
+import org.apache.storm.StormSubmitter;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -16,25 +14,25 @@ import org.apache.storm.tuple.Tuple;
 import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 
+import java.util.Map;
+
 /**
  * 使用Storm实现积累求和的操作
  * 
  * @author ParadiseWY
- * @date 2020-10-29 14:42:43
+ * @date 2020-10-29 15:07:58
  * @git {@link https://github.com/mygodness100}
  */
-public class LocalSumStormTopology {
+public class SumAckerTopology {
 
 	/**
 	 * Spout需要继承BaseRichSpout 数据源需要产生数据并发射
 	 */
 	public static class DataSourceSpout extends BaseRichSpout {
 
-		private static final long serialVersionUID = -4040544563895235588L;
+		private static final long serialVersionUID = -6207416197275358268L;
 
 		private SpoutOutputCollector collector;
-
-		int number = 0;
 
 		/**
 		 * 初始化方法，只会被调用一次
@@ -48,6 +46,8 @@ public class LocalSumStormTopology {
 			this.collector = collector;
 		}
 
+		int number = 0;
+
 		/**
 		 * 会产生数据，在生产上肯定是从消息队列中获取数据
 		 *
@@ -56,6 +56,7 @@ public class LocalSumStormTopology {
 		public void nextTuple() {
 			this.collector.emit(new Values(++number));
 			System.out.println("Spout: " + number);
+			// 防止数据产生太快
 			Utils.sleep(1000);
 		}
 
@@ -74,7 +75,7 @@ public class LocalSumStormTopology {
 	 */
 	public static class SumBolt extends BaseRichBolt {
 
-		private static final long serialVersionUID = -1394110382583749261L;
+		private static final long serialVersionUID = 1594522929592940761L;
 
 		int sum = 0;
 
@@ -87,7 +88,6 @@ public class LocalSumStormTopology {
 		 */
 		public void prepare(@SuppressWarnings("rawtypes") Map stormConf, TopologyContext context,
 				OutputCollector collector) {
-
 		}
 
 		/**
@@ -112,10 +112,16 @@ public class LocalSumStormTopology {
 		// Storm中任何一个作业都是通过Topology的方式进行提交的
 		// Topology中需要指定Spout和Bolt的执行顺序
 		TopologyBuilder builder = new TopologyBuilder();
-		builder.setSpout("DataSourceSpout", new DataSourceSpout());
-		builder.setBolt("SumBolt", new SumBolt()).shuffleGrouping("DataSourceSpout");
-		// 创建一个本地Storm集群：本地模式运行，不需要搭建Storm集群
-		LocalCluster cluster = new LocalCluster();
-		cluster.submitTopology("LocalSumStormTopology", new Config(), builder.createTopology());
+		builder.setSpout("DataSourceSpout", new DataSourceSpout(), 2);
+		builder.setBolt("SumBolt", new SumBolt(), 2).setNumTasks(4).shuffleGrouping("DataSourceSpout");
+		// 代码提交到Storm集群上运行
+		String topoName = SumAckerTopology.class.getSimpleName();
+		try {
+			Config config = new Config();
+			config.setNumWorkers(2);
+			StormSubmitter.submitTopology(topoName, config, builder.createTopology());
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 	}
 }

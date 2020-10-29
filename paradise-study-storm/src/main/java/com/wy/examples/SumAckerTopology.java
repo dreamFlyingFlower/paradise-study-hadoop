@@ -3,7 +3,7 @@ package com.wy.examples;
 import java.util.Map;
 
 import org.apache.storm.Config;
-import org.apache.storm.StormSubmitter;
+import org.apache.storm.LocalCluster;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -17,20 +17,20 @@ import org.apache.storm.tuple.Values;
 import org.apache.storm.utils.Utils;
 
 /**
- * 使用Storm实现积累求和的操作
+ * 本地模式使用Storm实现积累求和的操作
  * 
  * @author ParadiseWY
- * @date 2020-10-29 14:38:00
+ * @date 2020-10-29 14:40:04
  * @git {@link https://github.com/mygodness100}
  */
-public class ClusterSumStormWorkersTopology {
+public class SumAckerTopology {
 
 	/**
 	 * Spout需要继承BaseRichSpout 数据源需要产生数据并发射
 	 */
 	public static class DataSourceSpout extends BaseRichSpout {
 
-		private static final long serialVersionUID = -4994814193609273668L;
+		private static final long serialVersionUID = 7122138467028985039L;
 
 		private SpoutOutputCollector collector;
 
@@ -54,9 +54,26 @@ public class ClusterSumStormWorkersTopology {
 		 * 这个方法是一个死循环，会一直不停的执行
 		 */
 		public void nextTuple() {
-			this.collector.emit(new Values(++number));
+			++number;
+			/**
+			 * emit方法有两个参数： 1） 数据 2） 数据的唯一编号 msgId 如果是数据库，msgId就可以采用表中的主键
+			 */
+			this.collector.emit(new Values(number), number);
 			System.out.println("Spout: " + number);
 			Utils.sleep(1000);
+		}
+
+		@Override
+		public void ack(Object msgId) {
+			System.out.println(" ack invoked ..." + msgId);
+		}
+
+		@Override
+		public void fail(Object msgId) {
+			System.out.println(" fail invoked ..." + msgId);
+			// 此处对失败的数据进行重发或者保存下来
+			// this.collector.emit(tuple)
+			// this.dao.saveMsg(msgId)
 		}
 
 		/**
@@ -74,7 +91,9 @@ public class ClusterSumStormWorkersTopology {
 	 */
 	public static class SumBolt extends BaseRichBolt {
 
-		private static final long serialVersionUID = 2473189301867776312L;
+		private static final long serialVersionUID = -6711406385481239350L;
+
+		private OutputCollector collector;
 
 		int sum = 0;
 
@@ -87,7 +106,7 @@ public class ClusterSumStormWorkersTopology {
 		 */
 		public void prepare(@SuppressWarnings("rawtypes") Map stormConf, TopologyContext context,
 				OutputCollector collector) {
-
+			this.collector = collector;
 		}
 
 		/**
@@ -99,6 +118,18 @@ public class ClusterSumStormWorkersTopology {
 			// Bolt中获取值可以根据index获取，也可以根据上一个环节中定义的field的名称获取(建议使用该方式)
 			Integer value = input.getIntegerByField("num");
 			sum += value;
+			// 假设大于10的就是失败
+			if (value > 0 && value <= 10) {
+				this.collector.ack(input); // 确认消息处理成功
+			} else {
+				this.collector.fail(input); // 确认消息处理失败
+			}
+			// try {
+			// 业务逻辑
+			// this.collector.ack(input);
+			// } catch (Exception e) {
+			// this.collector.fail(input);
+			// }
 			System.out.println("Bolt: sum = [" + sum + "]");
 		}
 
@@ -114,15 +145,8 @@ public class ClusterSumStormWorkersTopology {
 		TopologyBuilder builder = new TopologyBuilder();
 		builder.setSpout("DataSourceSpout", new DataSourceSpout());
 		builder.setBolt("SumBolt", new SumBolt()).shuffleGrouping("DataSourceSpout");
-		// 代码提交到Storm集群上运行
-		String topoName = ClusterSumStormWorkersTopology.class.getSimpleName();
-		try {
-			Config config = new Config();
-			config.setNumWorkers(2);
-			config.setNumAckers(0);
-			StormSubmitter.submitTopology(topoName, config, builder.createTopology());
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
+		// 创建一个本地Storm集群：本地模式运行，不需要搭建Storm集群
+		LocalCluster cluster = new LocalCluster();
+		cluster.submitTopology("LocalSumAckerTopology", new Config(), builder.createTopology());
 	}
 }

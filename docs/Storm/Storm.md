@@ -333,6 +333,10 @@ bin/storm logviewer &
 * storm activate topology-name:激活指定的拓扑Spout
 * storm deactivate topology-name:禁用指定的拓扑Spout
 * storm help [command]:打印一条帮助消息或者可用命令的列表
+* storm rebalance topolotyName []:在不停机的情况下修改Storm中的Worker数量
+  * -w wait-time-secs:等待时长
+  * -n new-num-workers:新的workers数量
+  * -e component=parallelism:调整bolt的数量
 
 
 

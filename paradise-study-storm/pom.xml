@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<parent>
@@ -17,7 +16,16 @@
 
 	<properties>
 		<java.version>1.8</java.version>
+		<storm.version>1.2.3</storm.version>
 	</properties>
+
+	<!-- 需要手动下载kafka-avro-serializer-1.0.jar,以下为仓库地址 -->
+	<repositories>
+		<repository>
+			<id>confluent</id>
+			<url>http://packages.confluent.io/maven/</url>
+		</repository>
+	</repositories>
 
 	<dependencies>
 		<dependency>
@@ -32,8 +40,56 @@
 		<dependency>
 			<groupId>org.apache.storm</groupId>
 			<artifactId>storm-core</artifactId>
-			<version>1.2.3</version>
+			<version>${storm.version}</version>
 			<scope>${provided.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.storm</groupId>
+			<artifactId>storm-redis</artifactId>
+			<version>${storm.version}</version>
+			<scope>${provided.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.storm</groupId>
+			<artifactId>storm-jdbc</artifactId>
+			<version>${storm.version}</version>
+			<scope>${provided.scope}</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.storm</groupId>
+			<artifactId>storm-hdfs</artifactId>
+			<version>${storm.version}</version>
+			<scope>${provided.scope}</scope>
+			<!-- 若storm集成的hadoop版本和生产环境的不一样,需要剔除 -->
+			<!-- <exclusions> -->
+			<!-- <exclusion> -->
+			<!-- <groupId>org.apache.hadoop</groupId> -->
+			<!-- <artifactId>hadoop-client</artifactId> -->
+			<!-- </exclusion> -->
+			<!-- <exclusion> -->
+			<!-- <groupId>org.apache.hadoop</groupId> -->
+			<!-- <artifactId>hadoop-auth</artifactId> -->
+			<!-- </exclusion> -->
+			<!-- </exclusions> -->
+		</dependency>
+		<!-- 可能会出现guaua的jar冲突 -->
+		<dependency>
+			<groupId>org.apache.storm</groupId>
+			<artifactId>storm-hbase</artifactId>
+			<version>${storm.version}</version>
+		</dependency>
+		<!-- 解决hbase找不到jdk.tools的问题 -->
+		<dependency>
+			<groupId>jdk.tools</groupId>
+			<artifactId>jdk.tools</artifactId>
+			<version>1.8</version>
+			<scope>system</scope>
+			<systemPath>${JAVA_HOME}/lib/tools.jar</systemPath>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>1.0</version> <!-- Also tried 2.0-SNAPSHOT -->
 		</dependency>
 		<dependency>
 			<groupId>mysql</groupId>
@@ -67,5 +123,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>
