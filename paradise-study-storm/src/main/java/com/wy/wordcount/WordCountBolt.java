@@ -54,7 +54,6 @@ public class WordCountBolt implements IRichBolt {
 		// 计数
 		if (!counters.containsKey(word)) {
 			counters.put(word, 1);
-
 		} else {
 			Integer c = counters.get(word) + 1;
 			counters.put(word, c);

@@ -39,7 +39,6 @@ public class WordCountNormal implements IRichBolt {
 	public void prepare(@SuppressWarnings("rawtypes") Map stormConf, TopologyContext context,
 			OutputCollector collector) {
 		this.collector = collector;
-
 	}
 
 	/**
