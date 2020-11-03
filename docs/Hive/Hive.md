@@ -979,1465 +979,474 @@ FROM table_reference
 
 ## 基本查询
 
-### 简单查询
 
-* 单列,多列,全表查询和MySQL语法一样,可以使用列别名
-* 常用的count,sum,avg,max,min用法和MySQL一样
-* limit分页参数和MySQL一样
+
+### 基本语法
+
+* 所有基本的语法和通用SQL语法相同,分页,排序和MySQL相同
+* 函数count,sum,avg,max,min,group by,having和通用SQL语法相同
+* 比较运算符,like,in等和通用SQL语法相同
 * SQL语言大小写不敏感
 * SQL可以写在一行或者多行
 * 关键字不能被缩写也不能分行
 * 各子句一般要分行写
 * 使用缩进提高语句的可读性
+* JOIN等同于INNER JOIN,RIGHT JOIN,LEFT JOIN和通用SQL语法相同,不支持OR
+* 多表连接时每一个连接就会启动一个MR,有多少个启动多少个
+* Hive的多表连接是按照从左到右的顺序执行的
 
 
 
-### 算术运算符
+### Sort By
 
-| 运算符 | 描述           |
-| ------ | -------------- |
-| A+B    | A和B相加       |
-| A-B    | A减去B         |
-| A*B    | A和B相乘       |
-| A/B    | A除以B         |
-| A%B    | A对B取余       |
-| A&B    | A和B按位取与   |
-| A\|B   | A和B按位取或   |
-| A^B    | A和B按位取异或 |
-| ~A     | A按位取反      |
+* Sort By:每个Reducer内部进行排序,对全局结果集来说不是排序
 
-
-
-## Where
-
-1．使用WHERE子句,将不满足条件的行过滤掉
-
-2．WHERE子句紧随FROM子句
-
-3．案例实操
-
-查询出薪水大于1000的所有员工
-
-hive (default)> select * from emp where sal >1000;
-
-### 6.2.1 比较运算符（Between/In/ Is Null）
-
-1）下面表中描述了谓词操作符,这些操作符同样可以用于JOIN…ON和HAVING语句中.
-
-表6-4
-
-| 操作符                  | 支持的数据类型 | 描述                                                         |
-| ----------------------- | -------------- | ------------------------------------------------------------ |
-| A=B                     | 基本数据类型   | 如果A等于B则返回TRUE,反之返回FALSE                           |
-| A<=>B                   | 基本数据类型   | 如果A和B都为NULL,则返回TRUE,其他的和等号（=）操作符的结果一致,如果任一为NULL则结果为NULL |
-| A<>B, A!=B              | 基本数据类型   | A或者B为NULL则返回NULL;如果A不等于B,则返回TRUE,反之返回FALSE |
-| A<B                     | 基本数据类型   | A或者B为NULL,则返回NULL;如果A小于B,则返回TRUE,反之返回FALSE  |
-| A<=B                    | 基本数据类型   | A或者B为NULL,则返回NULL;如果A小于等于B,则返回TRUE,反之返回FALSE |
-| A>B                     | 基本数据类型   | A或者B为NULL,则返回NULL;如果A大于B,则返回TRUE,反之返回FALSE  |
-| A>=B                    | 基本数据类型   | A或者B为NULL,则返回NULL;如果A大于等于B,则返回TRUE,反之返回FALSE |
-| A [NOT] BETWEEN B AND C | 基本数据类型   | 如果A,B或者C任一为NULL,则结果为NULL.如果A的值大于等于B而且小于或等于C,则结果为TRUE,反之为FALSE.如果使用NOT关键字则可达到相反的效果. |
-| A IS NULL               | 所有数据类型   | 如果A等于NULL,则返回TRUE,反之返回FALSE                       |
-| A IS NOT NULL           | 所有数据类型   | 如果A不等于NULL,则返回TRUE,反之返回FALSE                     |
-| IN(数值1, 数值2)        | 所有数据类型   | 使用 IN运算显示列表中的值                                    |
-| A [NOT] LIKE B          | STRING 类型    | B是一个SQL下的简单正则表达式,如果A与其匹配的话,则返回TRUE;反之返回FALSE.B的表达式说明如下:‘x%’表示A必须以字母‘x’开头,‘%x’表示A必须以字母’x’结尾,而‘%x%’表示A包含有字母’x’,可以位于开头,结尾或者字符串中间.如果使用NOT关键字则可达到相反的效果. |
-| A RLIKE B, A REGEXP B   | STRING 类型    | B是一个正则表达式,如果A与其匹配,则返回TRUE;反之返回FALSE.匹配使用的是JDK中的正则表达式接口实现的,因为正则也依据其中的规则.例如,正则表达式必须和整个字符串A相匹配,而不是只需与其字符串匹配. |
-
-2）案例实操
-
-（1）查询出薪水等于5000的所有员工
-
-hive (default)> select * from emp where sal =5000;
-
-（2）查询工资在500到1000的员工信息
-
-hive (default)> select * from emp where sal between 500 and 1000;
-
-（3）查询comm为空的所有员工信息
-
-hive (default)> select * from emp where comm is null;
-
-（4）查询工资是1500或5000的员工信息
-
-hive (default)> select * from emp where sal IN (1500, 5000);
-
-### 6.2.2 Like和RLike
-
-1）使用LIKE运算选择类似的值
-
-2）选择条件可以包含字符或数字:
-
-% 代表零个或多个字符(任意个字符).
-
-_ 代表一个字符.
-
-3）RLIKE子句是Hive中这个功能的一个扩展,其可以通过Java的正则表达式这个更强大的语言来指定匹配条件.
-
-4）案例实操
-
-​    （1）查找以2开头薪水的员工信息
-
-hive (default)> select * from emp where sal LIKE '2%';
-
-​    （2）查找第二个数值为2的薪水的员工信息
-
-hive (default)> select * from emp where sal LIKE '_2%';
-
-​    （3）查找薪水中含有2的员工信息
-
-hive (default)> select * from emp where sal RLIKE '[2]';
-
-### 6.2.3 逻辑运算符（And/Or/Not）
-
-表6-5
-
-| 操作符 | 含义   |
-| ------ | ------ |
-| AND    | 逻辑并 |
-| OR     | 逻辑或 |
-| NOT    | 逻辑否 |
-
-案例实操
-
-​    （1）查询薪水大于1000,部门是30
-
-hive (default)> select * from emp where sal>1000 and deptno=30;
-
-​    （2）查询薪水大于1000,或者部门是30
-
-hive (default)> select * from emp where sal>1000 or deptno=30;
-
-​    （3）查询除了20部门和30部门以外的员工信息
-
-hive (default)> select * from emp where deptno not IN(30, 20);
-
-## 6.3 分组
-
-### 6.3.1 Group By语句
-
-GROUP BY语句通常会和聚合函数一起使用,按照一个或者多个列队结果进行分组,然后对每个组执行聚合操作.
-
-案例实操:
-
-​    （1）计算emp表每个部门的平均工资
-
-hive (default)> select t.deptno, avg(t.sal) avg_sal from emp t group by t.deptno;
-
-​    （2）计算emp每个部门中每个岗位的最高薪水
-
-hive (default)> select t.deptno, t.job, max(t.sal) max_sal from emp t group by
-
- t.deptno, t.job;
-
-### 6.3.2 Having语句
-
-1．having与where不同点
-
-（1）where针对表中的列发挥作用,查询数据;having针对查询结果中的列发挥作用,筛选数据.
-
-（2）where后面不能写分组函数,而having后面可以使用分组函数.
-
-（3）having只用于group by分组统计语句.
-
-2．案例实操
-
-（1）求每个部门的平均薪水大于2000的部门
-
-求每个部门的平均工资
-
-hive (default)> select deptno, avg(sal) from emp group by deptno;
-
-​     求每个部门的平均薪水大于2000的部门
-
-hive (default)> select deptno, avg(sal) avg_sal from emp group by deptno having
-
- avg_sal > 2000;
-
-## 6.4 Join语句
-
-### 6.4.1 等值Join
-
-Hive支持通常的SQL JOIN语句,但是只支持等值连接,不支持非等值连接.
-
-案例实操
-
-（1）根据员工表和部门表中的部门编号相等,查询员工编号、员工名称和部门名称;
-
-hive (default)> select e.empno, e.ename, d.deptno, d.dname from emp e join dept d
-
- on e.deptno = d.deptno;
-
-### 6.4.2 表的别名
-
-1．好处
-
-（1）使用别名可以简化查询.
-
-（2）使用表名前缀可以提高执行效率.
-
-2．案例实操
-
-合并员工表和部门表
-
-hive (default)> select e.empno, e.ename, d.deptno from emp e join dept d on e.deptno
-
- = d.deptno;
-
-### 6.4.3 内连接
-
-内连接:只有进行连接的两个表中都存在与连接条件相匹配的数据才会被保留下来.
-
-hive (default)> select e.empno, e.ename, d.deptno from emp e join dept d on e.deptno
-
- = d.deptno;
-
-### 6.4.4 左外连接
-
-左外连接:JOIN操作符左边表中符合WHERE子句的所有记录将会被返回.
-
-hive (default)> select e.empno, e.ename, d.deptno from emp e left join dept d on e.deptno
-
- = d.deptno;
-
-### 6.4.5 右外连接
-
-右外连接:JOIN操作符右边表中符合WHERE子句的所有记录将会被返回.
-
-hive (default)> select e.empno, e.ename, d.deptno from emp e right join dept d on e.deptno
-
- = d.deptno;
-
-### 6.4.6 满外连接
-
-​    满外连接:将会返回所有表中符合WHERE语句条件的所有记录.如果任一表的指定字段没有符合条件的值的话,那么就使用NULL值替代.
-
-hive (default)> select e.empno, e.ename, d.deptno from emp e full join dept d on e.deptno
-
- = d.deptno;
-
-### 6.4.7 多表连接
-
-注意:连接 n个表,至少需要n-1个连接条件.例如:连接三个表,至少需要两个连接条件.
-
-数据准备
-
-```
-# location.txt
-1700	Beijing
-1800	London
-1900	Tokyo
-```
-
-1．创建位置表
-
-  create table if not exists default.location(  loc int,  loc_name string  )  row format delimited fields terminated by '\t';  
-
-2．导入数据
-
-hive (default)> load data local inpath '/opt/module/datas/location.txt' into table default.location;
-
-3．多表连接查询
-
-hive (default)>SELECT e.ename, d.deptno, l. loc_name
-
-FROM  emp e 
-
-JOIN  dept d
-
-ON   d.deptno = e.deptno 
-
-JOIN  location l
-
-ON   d.loc = l.loc;
-
-大多数情况下,Hive会对每对JOIN连接对象启动一个MapReduce任务.本例中会首先启动一个MapReduce job对表e和表d进行连接操作,然后会再启动一个MapReduce job将第一个MapReduce job的输出和表l;进行连接操作.
-
-注意:为什么不是表d和表l先进行连接操作呢？这是因为Hive总是按照从左到右的顺序执行的.
-
-### 6.4.8 笛卡尔积
-
-1．笛卡尔集会在下面条件下产生
-
-（1）省略连接条件
-
-（2）连接条件无效
-
-（3）所有表中的所有行互相连接
-
-2．案例实操
-
-hive (default)> select empno, dname from emp, dept;
-
-### 6.4.9 连接谓词中不支持or
-
-hive (default)> select e.empno, e.ename, d.deptno from emp e join dept d on e.deptno
-
-= d.deptno or e.ename=d.ename;  错误的
-
-## 6.5 排序
-
-### 6.5.1 全局排序（Order By）
-
-Order By:全局排序,一个Reducer
-
-1．使用 ORDER BY 子句排序
-
-ASC（ascend）: 升序（默认）
-
-DESC（descend）: 降序
-
-2．ORDER BY 子句在SELECT语句的结尾
-
-3．案例实操
-
-​    （1）查询员工信息按工资升序排列
-
-hive (default)> select * from emp order by sal;
-
-​    （2）查询员工信息按工资降序排列
-
-hive (default)> select * from emp order by sal desc;
-
-### 6.5.2 按照别名排序
-
-按照员工薪水的2倍排序
-
-hive (default)> select ename, sal*2 twosal from emp order by twosal;
-
-### 6.5.3 多个列排序
-
-按照部门和工资升序排序
-
-hive (default)> select ename, deptno, sal from emp order by deptno, sal ;
-
-### 6.5.4 每个MapReduce内部排序（Sort By）
-
-Sort By:每个Reducer内部进行排序,对全局结果集来说不是排序.
-
-​    1．设置reduce个数
-
+```mysql
+# 设置reduce个数
 hive (default)> set mapreduce.job.reduces=3;
-
-2．查看设置reduce个数
-
+# 查看设置reduce个数
 hive (default)> set mapreduce.job.reduces;
-
-3．根据部门编号降序查看员工信息
-
+# 根据部门编号降序查看员工信息
 hive (default)> select * from emp sort by empno desc;
+# 将查询结果导入到文件中（按照部门编号降序排序）
+hive (default)> insert overwrite local directory '/opt/module/datas/sortby-result' select * from emp sort by deptno desc;
+```
 
-​    4．将查询结果导入到文件中（按照部门编号降序排序）
+​    
 
-hive (default)> insert overwrite local directory '/opt/module/datas/sortby-result'
+### Distribute By
 
- select * from emp sort by deptno desc;
+* 分区排序:类似MR中partition,进行分区,结合sort by使用
+* Hive要求DISTRIBUTE BY语句要写在SORT BY语句之前
+* 对于distribute by进行测试,一定要分配多reduce进行处理,否则无法看到distribute by的效果
 
-### 6.5.5 分区排序（Distribute By）
-
-Distribute By:类似MR中partition,进行分区,结合sort by使用.
-
-​    注意,Hive要求DISTRIBUTE BY语句要写在SORT BY语句之前.
-
-对于distribute by进行测试,一定要分配多reduce进行处理,否则无法看到distribute by的效果.
-
-案例实操:
-
-​    （1）先按照部门编号分区,再按照员工编号降序排序.
-
+```mysql
 hive (default)> set mapreduce.job.reduces=3;
-
 hive (default)> insert overwrite local directory '/opt/module/datas/distribute-result' select * from emp distribute by deptno sort by empno desc;
+```
 
-### 6.5.6 Cluster By
 
-当distribute by和sorts by字段相同时,可以使用cluster by方式.
 
-cluster by除了具有distribute by的功能外还兼具sort by的功能.但是排序只能是升序排序,不能指定排序规则为ASC或者DESC.
+### Cluster By
 
-1）以下两种写法等价
+* 当distribute by和sorts by字段相同时,可以使用cluster by方式
+* cluster by除了具有distribute by的功能外还兼具sort by的功能.但是排序只能是升序排序,不能指定排序规则为ASC或者DESC
 
+```mysql
+# 以下两种写法等价
+# 按照部门编号分区,不一定就是固定死的数值,可以是20号和30号部门分到一个分区里面去
 hive (default)> select * from emp cluster by deptno;
-
 hive (default)> select * from emp distribute by deptno sort by deptno;
+```
 
-注意:按照部门编号分区,不一定就是固定死的数值,可以是20号和30号部门分到一个分区里面去.
 
-## 6.6 分桶及抽样查询
 
-### 6.6.1 分桶表数据存储
+## 分桶表数据存储
 
-​    分区针对的是数据的存储路径;分桶针对的是数据文件.
+* 分区针对的是数据的存储路径;分桶针对的是数据文件
+* 分区提供一个隔离数据和优化查询的便利方式.不过,并非所有的数据集都可形成合理的分区,特别是之前所提到过的要确定合适的划分大小这个疑虑
+* 分桶是将数据集分解成更容易管理的若干部分的另一个技术
+* 先创建分桶表,通过直接导入数据文件的方式,数据准备:student.txt
 
-分区提供一个隔离数据和优化查询的便利方式.不过,并非所有的数据集都可形成合理的分区,特别是之前所提到过的要确定合适的划分大小这个疑虑.
-
-​    分桶是将数据集分解成更容易管理的若干部分的另一个技术.
-
-1．先创建分桶表,通过直接导入数据文件的方式
-
-（1）数据准备
-
-![txt](student.txt)
-
-（2）创建分桶表
-
-  create table stu_buck(id int, name string)  clustered by(id)   into 4 buckets  row format delimited fields terminated by '\t';  
-
-（3）查看表结构
-
+```mysql
+# 创建分桶表
+create table stu_buck(id int, name string)  clustered by(id) into 4 buckets  row format delimited fields terminated by '\t';
+# 查看表结构
 hive (default)> desc formatted stu_buck;
+# Num Buckets:      4
+# 导入数据到分桶表中
+hive (default)> load data local inpath '/opt/module/datas/student.txt' into table stu_buck;
+```
 
-Num Buckets:      4   
+* 查看创建的分桶表中是否分成4个桶,发现并没有分成4个桶
 
-（4）导入数据到分桶表中
+![](HiveBuck01.png)
 
-hive (default)> load data local inpath '/opt/module/datas/student.txt' into table
+* 创建分桶表时,数据通过子查询的方式导入
 
- stu_buck;
+```mysql
+# 先建一个普通的stu表
+create table stu(id int,name string) row format delimited fields terminated by '\t';
+# 向普通的stu表中导入数据
+load  data local inpath '/opt/module/datas/student.txt' into table stu;  
+# 清空stu_buck表中数据
+truncate  table stu_buck;  select  * from stu_buck;  
+# 导入数据到分桶表,通过子查询的方式
+insert  into table stu_buck  select  id, name from stu;  
+# 发现还是只有一个分桶
+```
 
-（5）查看创建的分桶表中是否分成4个桶,如图6-7所示
+* 发现仍然未分桶,是需要设置其他属性
 
-![img](file:///C:/Users/paradise/AppData/Local/Temp/msohtmlclip1/01/clip_image016.jpg)
+```mysql
+hive(default)> set hive.enforce.bucketing=true;
+hive(default)> set mapreduce.job.reduces=-1;
+hive(default)> insert into table stu_buck  select  id, name from stu;
+```
 
-图6-7 未分桶
+ ![](HiveBuck02.png)
 
-发现并没有分成4个桶.是什么原因呢？
+* 查询分桶的数据
 
-2．创建分桶表时,数据通过子查询的方式导入
+```mysql
+hive(default)>select * from stu_buck;
+# OK  stu_buck.id   stu_buck.name
+1004  ss4
+1008  ss8
+1012  ss12
+1016  ss16
+1001  ss1
+1005  ss5
+1009  ss9
+1013  ss13
+1002  ss2
+1006  ss6
+1010  ss10
+1014  ss14
+1003  ss3
+1007  ss7
+1011  ss11
+1015  ss15
+```
 
-（1）先建一个普通的stu表
 
-  create  table stu(id int, name string)  row  format delimited fields terminated by '\t';  
-
-（2）向普通的stu表中导入数据
-
-  load  data local inpath '/opt/module/datas/student.txt' into table stu;  
-
-（3）清空stu_buck表中数据
-
-  truncate  table stu_buck;  select  * from stu_buck;  
-
-（4）导入数据到分桶表,通过子查询的方式
-
-  insert  into table stu_buck  select  id, name from stu;  
-
-（5）发现还是只有一个分桶,如图6-8所示
-
-![img](file:///C:/Users/paradise/AppData/Local/Temp/msohtmlclip1/01/clip_image018.jpg)
-
-图6-8 未分桶
-
-（6）需要设置一个属性
-
-  hive  (default)> set hive.enforce.bucketing=true;  hive  (default)> set mapreduce.job.reduces=-1;  hive  (default)> insert into table stu_buck  select  id, name from stu;  
-
-![img](file:///C:/Users/paradise/AppData/Local/Temp/msohtmlclip1/01/clip_image020.jpg)
-
-图6-9 分桶
-
-（7）查询分桶的数据
-
-  hive  (default)> select * from stu_buck;  OK  stu_buck.id   stu_buck.name  1004  ss4  1008  ss8  1012  ss12  1016  ss16  1001  ss1  1005  ss5  1009  ss9  1013  ss13  1002  ss2  1006  ss6  1010  ss10  1014  ss14  1003  ss3  1007  ss7  1011  ss11  1015  ss15  
-
-### 6.6.2 分桶抽样查询
-
-对于非常大的数据集,有时用户需要使用的是一个具有代表性的查询结果而不是全部结果.Hive可以通过对表进行抽样来满足这个需求.
-
-查询表stu_buck中的数据.
-
-  hive  (default)> select * from stu_buck tablesample(bucket 1 out of 4 on id);  
-
-注:tablesample是抽样语句,语法:TABLESAMPLE(BUCKET x OUT OF y) .
-
-y必须是table总bucket数的倍数或者因子.hive根据y的大小,决定抽样的比例.例如,table总共分了4份,当y=2时,抽取(4/2=)2个bucket的数据,当y=8时,抽取(4/8=)1/2个bucket的数据.
-
-x表示从哪个bucket开始抽取,如果需要取多个分区,以后的分区号为当前分区号加上y.例如,table总bucket数为4,tablesample(bucket 1 out of 2),表示总共抽取（4/2=）2个bucket的数据,抽取第1(x)个和第3(x+y)个bucket的数据.
-
-注意:x的值必须小于等于y的值,否则
-
-FAILED: SemanticException [Error 10061]: Numerator should not be bigger than denominator in sample clause for table stu_buck
-
-## 6.7 其他常用查询函数
-
-### 6.7.1 空字段赋值
-
-\1.  函数说明
-
-NVL:给值为NULL的数据赋值,它的格式是NVL( string1, replace_with).它的功能是如果string1为NULL,则NVL函数返回replace_with的值,否则返回string1的值,如果两个参数都为NULL ,则返回NULL.
-
-\2.  数据准备:采用员工表
-
-\3.  查询:如果员工的comm为NULL,则用-1代替
-
-hive (default)> select nvl(comm,-1) from emp;
-
-OK
-
-_c0
-
-20.0
-
-300.0
-
-500.0
-
--1.0
-
-1400.0
-
--1.0
-
--1.0
-
--1.0
-
--1.0
-
-0.0
-
--1.0
-
--1.0
-
--1.0
-
--1.0
-
-\4.  查询:如果员工的comm为NULL,则用领导id代替
-
-hive (default)> select nvl(comm,mgr) from emp;
-
-OK
-
-_c0
-
-20.0
-
-300.0
-
-500.0
-
-7839.0
-
-1400.0
-
-7839.0
-
-7839.0
-
-7566.0
-
-NULL
-
-0.0
-
-7788.0
-
-7698.0
-
-7566.0
-
-### 6.7.2 CASE WHEN
-
-\1. 数据准备
-
-| name | dept_id | sex  |
-| ---- | ------- | ---- |
-| 悟空 | A       | 男   |
-| 大海 | A       | 男   |
-| 宋宋 | B       | 男   |
-| 凤姐 | A       | 女   |
-| 婷姐 | B       | 女   |
-| 婷婷 | B       | 女   |
-
-2．需求
-
-求出不同部门男女各多少人.结果如下:
-
-A   2    1
-
-B   1    2
-
-3．创建本地emp_sex.txt,导入数据
-
-[atguigu@hadoop102 datas]$ vi emp_sex.txt
-
-悟空 A  男
-
-大海 A  男
-
-宋宋 B  男
-
-凤姐 A  女
-
-婷姐 B  女
-
-婷婷 B  女
-
-4．创建hive表并导入数据
-
-create table emp_sex(
-
-name string, 
-
-dept_id string, 
-
-sex string) 
-
-row format delimited fields terminated by "\t";
-
-load data local inpath '/opt/module/datas/emp_sex.txt' into table emp_sex;
-
-5．按需求查询数据
-
-  select    dept_id,   sum(case  sex when '男' then 1 else 0 end)  male_count,   sum(case  sex when '女' then 1 else 0 end)  female_count  from    emp_sex  group by   dept_id;  
-
-### 6.7.2 行转列
-
-1．相关函数说明
-
-CONCAT(string A/col, string B/col…):返回输入字符串连接后的结果,支持任意个输入字符串;
-
-CONCAT_WS(separator, str1, str2,...):它是一个特殊形式的 CONCAT().第一个参数剩余参数间的分隔符.分隔符可以是与剩余参数一样的字符串.如果分隔符是 NULL,返回值也将为 NULL.这个函数会跳过分隔符参数后的任何 NULL 和空字符串.分隔符将被加到被连接的字符串之间;
-
-COLLECT_SET(col):函数只接受基本数据类型,它的主要作用是将某字段的值进行去重汇总,产生array类型字段.
-
-2．数据准备
-
-表6-6 数据准备
-
-| name   | constellation | blood_type |
-| ------ | ------------- | ---------- |
-| 孙悟空 | 白羊座        | A          |
-| 大海   | 射手座        | A          |
-| 宋宋   | 白羊座        | B          |
-| 猪八戒 | 白羊座        | A          |
-| 凤姐   | 射手座        | A          |
-
-3．需求
-
-把星座和血型一样的人归类到一起.结果如下:
-
-射手座,A      大海|凤姐
-
-白羊座,A      孙悟空|猪八戒
-
-白羊座,B       宋宋
-
-4．创建本地constellation.txt,导入数据
-
-[atguigu@hadoop102 datas]$ vi constellation.txt
-
-孙悟空  白羊座  A
-
-大海    射手座  A
-
-宋宋    白羊座  B
-
-猪八戒  白羊座  A
-
-凤姐    射手座  A
-
-5．创建hive表并导入数据
-
-create table person_info(
-
-name string, 
-
-constellation string, 
-
-blood_type string) 
-
-row format delimited fields terminated by "\t";
-
-load data local inpath “/opt/module/datas/person_info.txt” into table person_info;
-
-6．按需求查询数据
-
-  select    t1.base,      concat_ws('|', collect_set(t1.name)) name  from    (select      name,        concat(constellation, ",", blood_type) base    from        person_info) t1  group by    t1.base;  
-
-### 6.7.3 列转行
-
-1．函数说明
-
-EXPLODE(col):将hive一列中复杂的array或者map结构拆分成多行.
-
-LATERAL VIEW
-
-用法:LATERAL VIEW udtf(expression) tableAlias AS columnAlias
-
-解释:用于和split, explode等UDTF一起使用,它能够将一列数据拆成多行数据,在此基础上可以对拆分后的数据进行聚合.
-
-2．数据准备
-
-表6-7 数据准备
-
-| movie          | category                 |
-| -------------- | ------------------------ |
-| 《疑犯追踪》   | 悬疑,动作,科幻,剧情      |
-| 《Lie  to me》 | 悬疑,警匪,动作,心理,剧情 |
-| 《战狼2》      | 战争,动作,灾难           |
-
-3．需求
-
-将电影分类中的数组数据展开.结果如下:
-
-《疑犯追踪》   悬疑
-
-《疑犯追踪》   动作
-
-《疑犯追踪》   科幻
-
-《疑犯追踪》   剧情
-
-《Lie to me》  悬疑
-
-《Lie to me》  警匪
-
-《Lie to me》  动作
-
-《Lie to me》  心理
-
-《Lie to me》  剧情
-
-《战狼2》     战争
-
-《战狼2》     动作
-
-《战狼2》     灾难
-
-4．创建本地movie.txt,导入数据
-
-[atguigu@hadoop102 datas]$ vi movie.txt
-
-《疑犯追踪》  悬疑,动作,科幻,剧情
-
-《Lie to me》 悬疑,警匪,动作,心理,剧情
-
-《战狼2》 战争,动作,灾难
-
-5．创建hive表并导入数据
-
-  create table movie_info(    movie  string,     category  array<string>)   row format delimited fields terminated by  "\t"  collection items terminated by ",";     load data local inpath  "/opt/module/datas/movie.txt" into table movie_info;  
-
-6．按需求查询数据
-
-  select    movie,      category_name  from       movie_info lateral view explode(category) table_tmp as category_name;  
-
-### 6.7.4 窗口函数
-
-1．相关函数说明
-
-OVER():指定分析函数工作的数据窗口大小,这个数据窗口大小可能会随着行的变而变化
-
-CURRENT ROW:当前行
-
-n PRECEDING:往前n行数据
-
-n FOLLOWING:往后n行数据
-
-UNBOUNDED:起点,UNBOUNDED PRECEDING 表示从前面的起点, UNBOUNDED FOLLOWING表示到后面的终点
-
-LAG(col,n):往前第n行数据
-
-LEAD(col,n):往后第n行数据
-
-NTILE(n):把有序分区中的行分发到指定数据的组中,各个组有编号,编号从1开始,对于每一行,NTILE返回此行所属的组的编号.注意:n必须为int类型.
-
-2．数据准备:name,orderdate,cost
-
-jack,2017-01-01,10
-
-tony,2017-01-02,15
-
-jack,2017-02-03,23
-
-tony,2017-01-04,29
-
-jack,2017-01-05,46
-
-jack,2017-04-06,42
-
-tony,2017-01-07,50
-
-jack,2017-01-08,55
-
-mart,2017-04-08,62
-
-mart,2017-04-09,68
-
-neil,2017-05-10,12
-
-mart,2017-04-11,75
-
-neil,2017-06-12,80
-
-mart,2017-04-13,94
-
-3．需求
-
-（1）查询在2017年4月份购买过的顾客及总人数
-
-（2）查询顾客的购买明细及月购买总额
-
-（3）上述的场景,要将cost按照日期进行累加
-
-（4）查询顾客上次的购买时间
-
-（5）查询前20%时间的订单信息
-
-4．创建本地business.txt,导入数据
-
-[atguigu@hadoop102 datas]$ vi business.txt
-
-5．创建hive表并导入数据
-
-  create table business(  name string,   orderdate string,  cost int  ) ROW FORMAT DELIMITED FIELDS TERMINATED BY ',';     load data local inpath "/opt/module/datas/business.txt"  into table business;  
-
-6．按需求查询数据
-
-（1）查询在2017年4月份购买过的顾客及总人数
-
-  select name,count(*) over ()   from business   where substring(orderdate,1,7) = '2017-04'   group by name;  
-
-（2）查询顾客的购买明细及月购买总额
-
-  select name,orderdate,cost,sum(cost) over(partition  by month(orderdate)) from   business;  
-
-（3）上述的场景,要将cost按照日期进行累加
-
-  select name,orderdate,cost,   sum(cost) over() as sample1,--所有行相加   sum(cost) over(partition by name) as sample2,--按name分组,组内数据相加   sum(cost) over(partition by name order by  orderdate) as sample3,--按name分组,组内数据累加   sum(cost) over(partition by name order by orderdate  rows between UNBOUNDED PRECEDING and current row ) as sample4 ,--和sample3一样,由起点到当前行的聚合   sum(cost) over(partition by name order by orderdate  rows between 1 PRECEDING and current row) as sample5, --当前行和前面一行做聚合   sum(cost) over(partition by name order by orderdate  rows between 1 PRECEDING AND 1 FOLLOWING ) as sample6,--当前行和前边一行及后面一行   sum(cost) over(partition by name order by orderdate  rows between current row and UNBOUNDED FOLLOWING ) as sample7 --当前行及后面所有行   from business;  
-
-（4）查看顾客上次的购买时间
-
-  select name,orderdate,cost,   lag(orderdate,1,'1900-01-01') over(partition by  name order by orderdate ) as time1, lag(orderdate,2) over (partition by name  order by orderdate) as time2   from business;  
-
-（5）查询前20%时间的订单信息
-
-  select * from (    select  name,orderdate,cost, ntile(5) over(order by orderdate) sorted    from  business  ) t  where sorted = 1;  
-
-### 6.7.5 Rank
-
-1．函数说明
-
-RANK() 排序相同时会重复,总数不会变
-
-DENSE_RANK() 排序相同时会重复,总数会减少
-
-ROW_NUMBER() 会根据顺序计算
-
-2．数据准备
-
-表6-7 数据准备
-
-| name   | subject | score |
-| ------ | ------- | ----- |
-| 孙悟空 | 语文    | 87    |
-| 孙悟空 | 数学    | 95    |
-| 孙悟空 | 英语    | 68    |
-| 大海   | 语文    | 94    |
-| 大海   | 数学    | 56    |
-| 大海   | 英语    | 84    |
-| 宋宋   | 语文    | 64    |
-| 宋宋   | 数学    | 86    |
-| 宋宋   | 英语    | 84    |
-| 婷婷   | 语文    | 65    |
-| 婷婷   | 数学    | 85    |
-| 婷婷   | 英语    | 78    |
-
-3．需求
-
-计算每门学科成绩排名.
-
-4．创建本地movie.txt,导入数据
-
-[atguigu@hadoop102 datas]$ vi score.txt
-
-5．创建hive表并导入数据
-
-  create table score(  name string,  subject string,   score int)   row format delimited fields terminated by  "\t";  load data local inpath  '/opt/module/datas/score.txt' into table score;  
-
-6．按需求查询数据
-
-  select name,  subject,  score,  rank() over(partition by subject order by score  desc) rp,  dense_rank() over(partition by subject order by  score desc) drp,  row_number() over(partition by subject order by  score desc) rmp  from score;     name    subject score  rp   drp    rmp  孙悟空 数学  95     1    1    1  宋宋  数学  86     2    2    2  婷婷  数学  85     3    3    3  大海  数学  56     4    4    4  宋宋  英语  84     1    1    1  大海  英语  84     1    1    2  婷婷  英语  78     3    2    3  孙悟空 英语  68     4    3    4  大海  语文  94     1    1    1  孙悟空 语文  87     2    2    2  婷婷  语文  65     3    3    3  宋宋  语文  64     4    4    4  
-
-
-
-
-
-# 第7章 函数
-
-## 7.1 系统内置函数
-
-1．查看系统自带的函数
-
-hive> show functions;
-
-2．显示自带的函数的用法
-
-hive> desc function upper;
-
-3．详细显示自带的函数的用法
-
-hive> desc function extended upper;
-
-## 7.2 自定义函数
-
-1）Hive 自带了一些函数,比如:max/min等,但是数量有限,自己可以通过自定义UDF来方便的扩展.
-
-2）当Hive提供的内置函数无法满足你的业务处理需要时,此时就可以考虑使用用户自定义函数（UDF:user-defined function）.
-
-3）根据用户自定义函数类别分为以下三种:
-
-  （1）UDF（User-Defined-Function）
-
-​      一进一出
-
-  （2）UDAF（User-Defined Aggregation Function）
-
-​      聚集函数,多进一出
-
-​      类似于:count/max/min
-
-  （3）UDTF（User-Defined Table-Generating Functions）
-
-​      一进多出
-
-​      如lateral view explore()
-
-4）官方文档地址
-
-https://cwiki.apache.org/confluence/display/Hive/HivePlugins
-
-5）编程步骤:
-
-  （1）继承org.apache.hadoop.hive.ql.UDF
-
-  （2）需要实现evaluate函数;evaluate函数支持重载;
-
-  （3）在hive的命令行窗口创建函数
-
-​      a）添加jar
-
-add jar linux_jar_path
-
-​      b）创建function,
-
-create [temporary] function [dbname.]function_name AS class_name;
-
-  （4）在hive的命令行窗口删除函数
-
-Drop [temporary] function [if exists] [dbname.]function_name;
-
-6）注意事项
-
-  （1）UDF必须要有返回类型,可以返回null,但是返回类型不能为void;
-
-## 7.3 自定义UDF函数
-
-1．创建一个Maven工程Hive
-
-2．导入依赖
-
-  <dependencies>     <!--  https://mvnrepository.com/artifact/org.apache.hive/hive-exec -->     <dependency>       <groupId>org.apache.hive</groupId>       <artifactId>hive-exec</artifactId>       <version>1.2.1</version>     </dependency>  </dependencies>  
-
-3．创建一个类
-
-
-
-  package  com.atguigu.hive;  import org.apache.hadoop.hive.ql.exec.UDF;     public class Lower extends UDF {       public  String evaluate (final String s) {            if (s  == null) {        return  null;      }            return  s.toLowerCase();    }  }  
-
-4．打成jar包上传到服务器/opt/module/jars/udf.jar
-
-5．将jar包添加到hive的classpath
-
-hive (default)> add jar /opt/module/datas/udf.jar;
-
-6．创建临时函数与开发好的java class关联
-
-hive (default)> create temporary function mylower as "com.atguigu.hive.Lower";
-
-7．即可在hql中使用自定义的函数strip 
-
-hive (default)> select ename, mylower(ename) lowername from emp;
-
-# 第8章 压缩和存储
-
-## 8.1 Hadoop源码编译支持Snappy压缩
-
-### 8.1.1 资源准备
-
-1．CentOS联网 
-
-配置CentOS能连接外网.Linux虚拟机ping [www.baidu.com](http://www.baidu.com) 是畅通的
-
-注意:采用root角色编译,减少文件夹权限出现问题
-
-2．jar包准备(hadoop源码、JDK8 、maven、protobuf)
-
-（1）hadoop-2.7.2-src.tar.gz
-
-（2）jdk-8u144-linux-x64.tar.gz
-
-（3）snappy-1.1.3.tar.gz
-
-（4）apache-maven-3.0.5-bin.tar.gz
-
-（5）protobuf-2.5.0.tar.gz
-
-### 8.1.2 jar包安装
-
-注意:所有操作必须在root用户下完成
-
-1．JDK解压、配置环境变量JAVA_HOME和PATH,验证[java](http://lib.csdn.net/base/javase)-version(如下都需要验证是否配置成功)
-
-[root@hadoop101 software] # tar -zxf jdk-8u144-linux-x64.tar.gz -C /opt/module/
-
-[root@hadoop101 software]# vi /etc/profile
-
-  #JAVA_HOME  export  JAVA_HOME=/opt/module/jdk1.8.0_144  export  PATH=$PATH:$JAVA_HOME/bin  
-
-[root@hadoop101 software]#source /etc/profile
-
-验证命令:java -version
-
-2．Maven解压、配置  MAVEN_HOME和PATH
-
-[root@hadoop101 software]# tar -zxvf apache-maven-3.0.5-bin.tar.gz -C /opt/module/
-
-[root@hadoop101 apache-maven-3.0.5]# vi /etc/profile
-
-  #MAVEN_HOME  export  MAVEN_HOME=/opt/module/apache-maven-3.0.5  export  PATH=$PATH:$MAVEN_HOME/bin  
-
-[root@hadoop101 software]#source /etc/profile
-
-验证命令:mvn -version
-
-### 8.1.3 编译源码
-
-1．准备编译环境
-
-[root@hadoop101 software]# yum install svn
-
-[root@hadoop101 software]# yum install autoconf automake libtool cmake
-
-[root@hadoop101 software]# yum install ncurses-devel
-
-[root@hadoop101 software]# yum install openssl-devel
-
-[root@hadoop101 software]# yum install gcc*
-
-2．编译安装snappy
-
-[root@hadoop101 software]# tar -zxvf snappy-1.1.3.tar.gz -C /opt/module/
-
-[root@hadoop101 module]# cd snappy-1.1.3/
-
-[root@hadoop101 snappy-1.1.3]# ./configure
-
-[root@hadoop101 snappy-1.1.3]# make
-
-[root@hadoop101 snappy-1.1.3]# make install
-
-\# 查看snappy库文件
-
-[root@hadoop101 snappy-1.1.3]# ls -lh /usr/local/lib |grep snappy
-
-3．编译安装protobuf
-
-[root@hadoop101 software]# tar -zxvf protobuf-2.5.0.tar.gz -C /opt/module/
-
-[root@hadoop101 module]# cd protobuf-2.5.0/
-
-[root@hadoop101 protobuf-2.5.0]# ./configure 
-
-[root@hadoop101 protobuf-2.5.0]# make 
-
-[root@hadoop101 protobuf-2.5.0]# make install
-
-\# 查看protobuf版本以测试是否安装成功
- [root@hadoop101 protobuf-2.5.0]# protoc --version
-
-4．编译hadoop native
-
-[root@hadoop101 software]# tar -zxvf hadoop-2.7.2-src.tar.gz
-
-[root@hadoop101 software]# cd hadoop-2.7.2-src/
-
-[root@hadoop101 software]# mvn clean package -DskipTests -Pdist,native -Dtar -Dsnappy.lib=/usr/local/lib -Dbundle.snappy
-
-执行成功后,/opt/software/hadoop-2.7.2-src/hadoop-dist/target/[hadoop](http://lib.csdn.net/base/hadoop)-2.7.2.tar.gz即为新生成的支持snappy压缩的二进制安装包.
-
- 
-
-## 8.2 Hadoop压缩配置
-
-### 8.2.1 MR支持的压缩编码
-
-表6-8
-
-| 压缩格式 | 工具  | 算法    | 文件扩展名 | 是否可切分 |
-| -------- | ----- | ------- | ---------- | ---------- |
-| DEFAULT  | 无    | DEFAULT | .deflate   | 否         |
-| Gzip     | gzip  | DEFAULT | .gz        | 否         |
-| bzip2    | bzip2 | bzip2   | .bz2       | 是         |
-| LZO      | lzop  | LZO     | .lzo       | 是         |
-| Snappy   | 无    | Snappy  | .snappy    | 否         |
-
-为了支持多种压缩/解压缩算法,Hadoop引入了编码/解码器,如下表所示:
-
-表6-9
-
-| 压缩格式 | 对应的编码/解码器                          |
-| -------- | ------------------------------------------ |
-| DEFLATE  | org.apache.hadoop.io.compress.DefaultCodec |
-| gzip     | org.apache.hadoop.io.compress.GzipCodec    |
-| bzip2    | org.apache.hadoop.io.compress.BZip2Codec   |
-| LZO      | com.hadoop.compression.lzo.LzopCodec       |
-| Snappy   | org.apache.hadoop.io.compress.SnappyCodec  |
-
-压缩性能的比较:
-
-表6-10
-
-| 压缩算法 | 原始文件大小 | 压缩文件大小 | 压缩速度 | 解压速度 |
-| -------- | ------------ | ------------ | -------- | -------- |
-| gzip     | 8.3GB        | 1.8GB        | 17.5MB/s | 58MB/s   |
-| bzip2    | 8.3GB        | 1.1GB        | 2.4MB/s  | 9.5MB/s  |
-| LZO      | 8.3GB        | 2.9GB        | 49.3MB/s | 74.6MB/s |
-
-http://google.github.io/snappy/
-
-On a single core of a Core i7 processor in 64-bit mode, Snappy compresses at about 250 MB/sec or more and decompresses at about 500 MB/sec or more.
-
-### 8.2.2 压缩参数配置
-
-要在Hadoop中启用压缩,可以配置如下参数（mapred-site.xml文件中）:
-
-表6-11
-
-| 参数                                               | 默认值                                                       | 阶段        | 建议                                         |
-| -------------------------------------------------- | ------------------------------------------------------------ | ----------- | -------------------------------------------- |
-| io.compression.codecs    （在core-site.xml中配置） | org.apache.hadoop.io.compress.DefaultCodec,  org.apache.hadoop.io.compress.GzipCodec,  org.apache.hadoop.io.compress.BZip2Codec,  org.apache.hadoop.io.compress.Lz4Codec | 输入压缩    | Hadoop使用文件扩展名判断是否支持某种编解码器 |
-| mapreduce.map.output.compress                      | false                                                        | mapper输出  | 这个参数设为true启用压缩                     |
-| mapreduce.map.output.compress.codec                | org.apache.hadoop.io.compress.DefaultCodec                   | mapper输出  | 使用LZO、LZ4或snappy编解码器在此阶段压缩数据 |
-| mapreduce.output.fileoutputformat.compress         | false                                                        | reducer输出 | 这个参数设为true启用压缩                     |
-| mapreduce.output.fileoutputformat.compress.codec   | org.apache.hadoop.io.compress.  DefaultCodec                 | reducer输出 | 使用标准工具或者编解码器,如gzip和bzip2       |
-| mapreduce.output.fileoutputformat.compress.type    | RECORD                                                       | reducer输出 | SequenceFile输出使用的压缩类型:NONE和BLOCK   |
-
- 
-
-## 8.3 开启Map输出阶段压缩
-
-开启map输出阶段压缩可以减少job中map和Reduce task间数据传输量.具体配置如下:
-
-**案例实操:**
-
-1．开启hive中间传输数据压缩功能
-
+
+## 分桶抽样查询
+
+* 对于非常大的数据集,有时用户需要使用的是一个具有代表性的查询结果而不是全部结果.Hive可以通过对表进行抽样来满足这个需求
+* 查询表stu_buck中的数据
+
+```mysql
+hive  (default)> select * from stu_buck tablesample(bucket 1 out of 4 on id);
+```
+
+* tablesample是抽样语句,语法:TABLESAMPLE(BUCKET x OUT OF y) 
+  * y必须是table总bucket数的倍数或者因子
+  * hive根据y的大小,决定抽样的比例
+  * 例如,table总共分了4份,当y=2时,抽取(4/2=)2个bucket的数据
+  * x表示从哪个bucket开始抽取,如果需要取多个分区,以后的分区号为当前分区号加上y
+  * 例如,table总bucket数为4,tablesample(bucket 1 out of 2),表示总共抽取(4/2)2个bucket的数据,抽取第1(x)个和第3(x+y)个bucket的数据
+  * x的值必须小于等于y的值,否则抛异常:FAILED: SemanticException [Error 10061]: Numerator should not be bigger than denominator in sample clause for table stu_buck
+
+
+
+## NVL
+
+* NVL(str1,str2):str1不为NULL,返回str1;为NULL则返回str2.若str1,str2都为NULL,返回NULL
+
+
+
+## CASE WHEN
+
+* 同通用SQL语法
+
+
+
+## 行转列
+
+* CONCAT(string A/col, string B/col…):返回输入字符串连接后的结果,支持任意个输入字符串
+
+* CONCAT_WS(separator, str1, str2,...):它是一个特殊形式的CONCAT()
+  * 第一个参数是后面所有参数间的分隔符,会将被加到后面所有参数的之间
+  * 如果分隔符是NULL,返回值也将为NULL
+  * 这个函数会跳过分隔符参数后的任何NULL和空字符串
+
+* COLLECT_SET(col):只接受基本数据类型,作用是将某字段的值进行去重汇总,产生array类型字段
+  * 该函数可以配合CONCAT_WS使用,它的结果可以作为CONCAT_WS的第二个参数
+
+```mysql
+# 表结构
+# name	constellation	blood_type
+# 孙悟空	白羊座	   			A
+# 大海	 射手座			A
+# 宋宋	 白羊座			B
+# 猪八戒	白羊座				A
+# 凤姐	 射手座			 A
+select t1.base,concat_ws('|', collect_set(t1.name)) name from 
+(select name,concat(constellation, ",", blood_type) basefrom person_info) t1
+group by t1.base;
+# 结果
+# 射手座,A            大海|凤姐
+# 白羊座,A            孙悟空|猪八戒
+# 白羊座,B            宋宋
+```
+
+
+
+## 列转行
+
+* EXPLODE(col):将hive一列中复杂的array或者map结构拆分成多行
+
+* LATERAL VIEW udtf(expression) tableAlias AS columnAlias:用于和split,explode等UDTF一起使用,它能够将一列数据拆成多行数据,在此基础上可以对拆分后的数据进行聚合
+
+```mysql
+# 表结构
+# movie        			category
+# 《疑犯追踪》    	   悬疑,动作,科幻,剧情
+# 《Lie to me》  	  	 悬疑,警匪,动作,心理,剧情
+# 《战狼2》      		战争,动作,灾难
+select movie,category_name from movie_info lateral view explode(category) table_tmp as category_name;
+# 结果
+# movie		category_name
+# 《疑犯追踪》   悬疑
+# 《疑犯追踪》   动作
+# 《疑犯追踪》   科幻
+# 《疑犯追踪》   剧情
+# 《Lie to me》  悬疑
+# 《Lie to me》  警匪
+# 《Lie to me》  动作
+# 《Lie to me》  心理
+# 《Lie to me》  剧情
+# 《战狼2》     战争
+# 《战狼2》     动作
+# 《战狼2》     灾难
+```
+
+   
+
+## 窗口函数
+
+* OVER():指定分析函数工作的数据窗口大小,这个数据窗口大小可能会随着行的变而变化
+* CURRENT ROW:当前行
+* n PRECEDING:往前n行数据
+* n FOLLOWING:往后n行数据
+* UNBOUNDED:起点,UNBOUNDED PRECEDING 表示从前面的起点, UNBOUNDED FOLLOWING表示到后面的终点
+* LAG(col,n):往前第n行数据
+* LEAD(col,n):往后第n行数据
+* NTILE(n):把有序分区中的行分发到指定数据的组中,各个组有编号,编号从1开始,对于每一行,NTILE返回此行所属的组的编号.注意:n必须为int类型
+
+```mysql
+# 表结构
+# name,orderdate,cost
+# jack,2017-01-01,10
+# tony,2017-01-02,15
+# jack,2017-02-03,23
+# tony,2017-01-04,29
+# jack,2017-01-05,46
+# jack,2017-04-06,42
+# tony,2017-01-07,50
+# jack,2017-01-08,55
+# mart,2017-04-08,62
+# mart,2017-04-09,68
+# neil,2017-05-10,12
+# mart,2017-04-11,75
+# neil,2017-06-12,80
+# mart,2017-04-13,94
+# 1.查询在2017年4月份购买过的顾客及总人数
+select name,count(*) over()   from business   where substring(orderdate,1,7) = '2017-04'   group by name;
+# 2.查询顾客的购买明细及月购买总额
+select name,orderdate,cost,sum(cost) over(partition  by month(orderdate)) from   business;
+# 3.上述的场景,要将cost按照日期进行累加
+select name,orderdate,cost,sum(cost) over() as sample1,--所有行相加
+sum(cost) over(partition by name) as sample2,--按name分组,组内数据相加   sum(cost) over(partition by name order by orderdate) as sample3,--按name分组,组内数据累加   
+sum(cost) over(partition by name order by orderdate  rows between UNBOUNDED PRECEDING and current row ) as sample4,--和sample3一样,由起点到当前行的聚合
+sum(cost) over(partition by name order by orderdate  rows between 1 PRECEDING and current row) as sample5, --当前行和前面一行做聚合
+sum(cost) over(partition by name order by orderdate  rows between 1 PRECEDING AND 1 FOLLOWING ) as sample6,--当前行和前边一行及后面一行   
+sum(cost) over(partition by name order by orderdate  rows between current row and UNBOUNDED FOLLOWING ) as sample7 --当前行及后面所有行
+from business;  
+# 4.查询顾客上次的购买时间
+select name,orderdate,cost,lag(orderdate,1,'1900-01-01') over(partition by  name order by orderdate ) as time1, lag(orderdate,2) over (partition by name  order by orderdate) as time2 from business; 
+# 5.查询前20%时间的订单信息
+select * from (select name,orderdate,cost, ntile(5) over(order by orderdate) sorted from business) t where sorted = 1;  
+```
+
+  
+
+## Rank
+
+* RANK():排序相同时会重复,总数不会变
+* DENSE_RANK():排序相同时会重复,总数会减少
+* ROW_NUMBER():会根据顺序计算
+
+```mysql
+ name    subject  score 
+ 孙悟空  语文     87
+ 孙悟空  数学     95
+ 孙悟空  英语     68
+ 大海    语文     94
+ 大海    数学     56
+ 大海    英语     84
+ 宋宋    语文     64
+ 宋宋    数学     86
+ 宋宋    英语     84
+ 婷婷    语文     65
+ 婷婷    数学     85
+ 婷婷    英语     78
+# 计算每门学科成绩排名
+select name,subject,score,rank() over(partition by subject order by score  desc) rp,dense_rank() over(partition by subject order by  score desc) drp,  row_number() over(partition by subject order by  score desc) rmp from score;
+# 结果
+# name subject score rp drp rmp 
+# 孙悟空 数学  95     1    1    1  
+# 宋宋  数学  86     2    2    2  
+# 婷婷  数学  85     3    3    3  
+# 大海  数学  56     4    4    4  
+# 宋宋  英语  84     1    1    1  
+# 大海  英语  84     1    1    2  
+# 婷婷  英语  78     3    2    3  
+# 孙悟空 英语  68     4    3    4  
+# 大海  语文  94     1    1    1  
+# 孙悟空 语文  87     2    2    2  
+# 婷婷  语文  65     3    3    3  
+# 宋宋  语文  64     4    4    4  
+```
+
+
+
+# 函数
+
+## 内置函数
+
+* show functions:查看系统自带的函数
+* desc function upper:显示自带的函数的用法
+* desc function extended upper:详细显示自带的函数的用法
+
+
+
+## 自定义函数
+
+* [官方文档](https://cwiki.apache.org/confluence/display/Hive/HivePlugins)
+* UDF:user-defined function,用户自定义函数,一进一出
+* UDAF:User-Defined Aggregation Function:聚集函数,多进一出,类似于:count/max/min
+* UDTF:User-Defined Table-Generating Functions:一进多出,如lateral view explore()
+* 利用Java开发UDF,步骤如下:
+  * 继承org.apache.hadoop.hive.ql.UDF
+  * 需要重写evaluate方法,evaluate方法支持重载
+  * 在hive命令行添加打包好的jar:add jar udf_jar_path
+  * 创建function:create [temporary] function [dbname.]function_name AS class_name;
+  * 删除函数:Drop [temporary] function [if exists] [dbname.]function_name;
+* UDF必须要有返回类型,可以返回null,但是返回类型不能为void
+
+
+
+# 压缩
+
+> 需要使用到Hadoop的压缩功能,若需要使用Snappy则需要自行编译
+
+
+
+## Map压缩
+
+> 开启map输出阶段压缩可以减少job中map和Reduce task间数据传输量
+
+```mysql
+# 1.开启hive中间传输数据压缩功能
 hive (default)>set hive.exec.compress.intermediate=true;
-
-2．开启mapreduce中map输出压缩功能
-
+# 2.开启mapreduce中map输出压缩功能
 hive (default)>set mapreduce.map.output.compress=true;
-
-3．设置mapreduce中map输出数据的压缩方式
-
+# 3.设置mapreduce中map输出数据的压缩方式,可根据需求自定修改
 hive (default)>set mapreduce.map.output.compress.codec=
-
  org.apache.hadoop.io.compress.SnappyCodec;
+# 4.执行查询语句
+hive (default)> select count(ename) name from emp;
+```
 
-4．执行查询语句
 
-  hive (default)> select count(ename) name from emp;
 
-## 8.4 开启Reduce输出阶段压缩
+## Reduce压缩
 
-当Hive将输出写入到表中时,输出内容同样可以进行压缩.属性hive.exec.compress.output控制着这个功能.用户可能需要保持默认设置文件中的默认值false,这样默认的输出就是非压缩的纯文本文件了.用户可以通过在查询语句或执行脚本中设置这个值为true,来开启输出结果压缩功能.
+> 当Hive将输出写入到表中时,输出内容同样可以进行压缩.属性hive.exec.compress.output控制着这个功能.用户可能需要保持默认设置文件中的默认值false,这样默认的输出就是非压缩的纯文本文件了.用户可以通过在查询语句或执行脚本中设置这个值为true,来开启输出结果压缩功能
 
-**案例实操:**
 
-1．开启hive最终输出数据压缩功能
 
+```mysql
+# 1.开启hive最终输出数据压缩功能
 hive (default)>set hive.exec.compress.output=true;
-
-2．开启mapreduce最终输出数据压缩
-
+# 2.开启mapreduce最终输出数据压缩
 hive (default)>set mapreduce.output.fileoutputformat.compress=true;
-
-3．设置mapreduce最终数据输出压缩方式
-
+# 3.设置mapreduce最终数据输出压缩方式
 hive (default)> set mapreduce.output.fileoutputformat.compress.codec =
-
  org.apache.hadoop.io.compress.SnappyCodec;
-
-4．设置mapreduce最终数据输出压缩为块压缩
-
+# 4.设置mapreduce最终数据输出压缩为块压缩
 hive (default)> set mapreduce.output.fileoutputformat.compress.type=BLOCK;
-
-5．测试一下输出结果是否是压缩文件
-
+# 5.测试一下输出结果是否是压缩文件
 hive (default)> insert overwrite local directory
-
  '/opt/module/datas/distribute-result' select * from emp distribute by deptno sort by empno desc;
+```
 
-## 8.5 文件存储格式
 
-Hive支持的存储数的格式主要有:TEXTFILE 、SEQUENCEFILE、ORC、PARQUET.
 
-### 8.5.1 列式存储和行式存储
+## 文件存储格式
+
+* Hive支持的存储数的格式主要有:TEXTFILE,SEQUENCEFILE,ORC,PARQUET
+
+* 存储文件的压缩比:ORC > Parquet > textFile
+* 存储文件的查询速度:查询速度相近
+
+
+
+### 列存储和行存储
 
 ![img](HiveStore.png)
 
-图6-10 列式存储和行式存储
+* 行存储的特点:查询满足条件的一整行数据的时候,列存储则需要去每个聚集的字段找到对应的每个列的值,行存储只需要找到其中一个值,其余的值都在相邻地方,所以此时行存储查询的速度更快
+* 列存储的特点:因为每个字段的数据聚集存储,在查询只需要少数几个字段的时候,能大大减少读取的数据量;每个字段的数据类型一定是相同的,列式存储可以针对性的设计更好的设计压缩算法
+* TEXTFILE和SEQUENCEFILE的存储格式都是基于行存储的
+* ORC和PARQUET是基于列式存储的
 
-如图6-10所示左边为逻辑表,右边第一个为行式存储,第二个为列式存储.
 
-1．行存储的特点
 
-查询满足条件的一整行数据的时候,列存储则需要去每个聚集的字段找到对应的每个列的值,行存储只需要找到其中一个值,其余的值都在相邻地方,所以此时行存储查询的速度更快.
+### TextFile格式
 
-2．列存储的特点
+> 默认格式,数据不做压缩,磁盘开销大,数据解析开销大.可结合Gzip,Bzip2使用,但使用Gzip这种方式,hive不会对数据进行切分,从而无法对数据进行并行操作
 
-因为每个字段的数据聚集存储,在查询只需要少数几个字段的时候,能大大减少读取的数据量;每个字段的数据类型一定是相同的,列式存储可以针对性的设计更好的设计压缩算法.
 
-TEXTFILE和SEQUENCEFILE的存储格式都是基于行存储的;
 
-ORC和PARQUET是基于列式存储的.
+### Orc格式
 
-### 8.5.2 TextFile格式
-
-默认格式,数据不做压缩,磁盘开销大,数据解析开销大.可结合Gzip、Bzip2使用,但使用Gzip这种方式,hive不会对数据进行切分,从而无法对数据进行并行操作.
-
-### 8.5.3 Orc格式
-
-Orc (Optimized Row Columnar)是Hive 0.11版里引入的新的存储格式.
-
-如图6-11所示可以看到每个Orc文件由1个或多个stripe组成,每个stripe250MB大小,这个Stripe实际相当于RowGroup概念,不过大小由4MB->250MB,这样应该能提升顺序读的吞吐率.每个Stripe里有三部分组成,分别是Index Data,Row Data,Stripe Footer:
+* Orc(Optimized Row Columnar)是Hive0.11版里引入的新的存储格式
+* 每个Orc文件由1个或多个stripe组成,每个stripe250MB大小,这个Stripe实际相当于RowGroup概念,不过大小由4MB->250MB,这样应该能提升顺序读的吞吐率
+* 每个Stripe里有三部分组成,分别是Index Data,Row Data,Stripe Footer
 
 ![img](HiveStripe.png)
 
-图6-11 Orc格式
+* Index Data:一个轻量级的index,默认是每隔1W行做一个索引.这里做的索引应该只是记录某行的各字段在Row Data中的offset
+* Row Data:存的是具体的数据,先取部分行,然后对这些行按列进行存储.对每个列进行了编码,分成多个Stream来存储
+* Stripe Footer:存的是各个Stream的类型,长度等信息
+* 每个文件有一个File Footer,存储的是每个Stripe的行数,每个Column的数据类型信息等
+* 每个文件的尾部是一个PostScript,存储了整个文件的压缩类型以及FileFooter的长度信息等
+* 在读取文件时,会seek到文件尾部读PostScript,从里面解析到File Footer长度,再读FileFooter,从里面解析到各个Stripe信息,再读各个Stripe,即从后往前读
 
-​    1）Index Data:一个轻量级的index,默认是每隔1W行做一个索引.这里做的索引应该只是记录某行的各字段在Row Data中的offset.
 
-   2）Row Data:存的是具体的数据,先取部分行,然后对这些行按列进行存储.对每个列进行了编码,分成多个Stream来存储.
 
-​    3）Stripe Footer:存的是各个Stream的类型,长度等信息.
+### Parquet格式
 
-每个文件有一个File Footer,这里面存的是每个Stripe的行数,每个Column的数据类型信息等;每个文件的尾部是一个PostScript,这里面记录了整个文件的压缩类型以及FileFooter的长度信息等.在读取文件时,会seek到文件尾部读PostScript,从里面解析到File Footer长度,再读FileFooter,从里面解析到各个Stripe信息,再读各个Stripe,即从后往前读.
-
-### 8.5.4 Parquet格式
-
-Parquet是面向分析型业务的列式存储格式,由Twitter和Cloudera合作开发,2015年5月从Apache的孵化器里毕业成为Apache顶级项目.
-
-Parquet文件是以二进制方式存储的,所以是不可以直接读取的,文件中包括该文件的数据和元数据,因此Parquet格式文件是自解析的.
-
-通常情况下,在存储Parquet数据的时候会按照Block大小设置行组的大小,由于一般情况下每一个Mapper任务处理数据的最小单位是一个Block,这样可以把每一个行组由一个Mapper任务处理,增大任务执行并行度.Parquet文件的格式如图6-12所示.
+* Parquet是面向分析型业务的列式存储格式
+* Parquet文件是以二进制方式存储的,所以是不可以直接读取的,文件中包括该文件的数据和元数据,因此Parquet格式文件是自解析的
+* 在存储Parquet数据的时候会按照Block大小设置行组的大小,由于一般情况下每一个Mapper任务处理数据的最小单位是一个Block,这样可以把每一个行组由一个Mapper任务处理,增大任务执行并行度
 
 ![Parquet文件格式](HiveParquet.png)
 
-图6-12 Parquet格式
+* 一个Parquet文件中可以存储多个行组,文件的首位都是该文件的Magic Code,用于校验它是否是一个Parquet文件
+* Footer length记录了文件元数据的大小,通过该值和文件长度可以计算出元数据的偏移量,文件的元数据中包括每一个行组的元数据信息和该文件存储数据的Schema信息
+* 除了文件中每一个行组的元数据,每一页的开始都会存储该页的元数据
+* 在Parquet中,有三种类型的页:数据页,字典页和索引页
+  * 数据页用于存储当前行组中该列的值
+  * 字典页存储该列值的编码字典,每一个列块中最多包含一个字典页
+  * 索引页用来存储当前行组下该列的索引,目前Parquet中还不支持索引页
 
-上图展示了一个Parquet文件的内容,一个文件中可以存储多个行组,文件的首位都是该文件的Magic Code,用于校验它是否是一个Parquet文件,Footer length记录了文件元数据的大小,通过该值和文件长度可以计算出元数据的偏移量,文件的元数据中包括每一个行组的元数据信息和该文件存储数据的Schema信息.除了文件中每一个行组的元数据,每一页的开始都会存储该页的元数据,在Parquet中,有三种类型的页:数据页、字典页和索引页.数据页用于存储当前行组中该列的值,字典页存储该列值的编码字典,每一个列块中最多包含一个字典页,索引页用来存储当前行组下该列的索引,目前Parquet中还不支持索引页.
 
-### 8.5.5 主流文件存储格式对比实验
 
-从存储文件的压缩比和查询速度两个角度对比.
+## 存储和压缩结合
 
-**存储文件的压缩比测试:**
+* 修改Hadoop集群具有Snappy压缩方式
+* 查看hadoop checknative命令使用
 
-\1.  测试数据
+```shell
+hadoop checknative [-a|-h] check native hadoop and compression libraries availability
+```
 
-![img](file:///C:/Users/paradise/AppData/Local/Temp/msohtmlclip1/01/clip_image008.png)
+* 查看hadoop支持的压缩方式:hadoop checknative
+* 将编译好的支持Snappy压缩的hadoop-2.7.2.tar.gz上传解压到指定目录中
+* 进入到/app/hadoop-2.7.2/lib/native路径可以看到支持Snappy压缩的动态链接库
+* 复制/app/hadoop-2.7.2/lib/native里面的所有内容到开发集群的相同目录下
+* 再次查看hadoop支持的压缩类型:hadoop checknative
+* 重新启动hadoop集群和hive
 
-2．TextFile
 
-（1）创建表,存储数据格式为TEXTFILE
 
-  create  table log_text (  track_time  string,  url  string,  session_id  string,  referer  string,  ip  string,  end_user_id  string,  city_id  string  )  row  format delimited fields terminated by '\t'  stored  as textfile ;  
+## 测试存储和压缩
 
-（2）向表中加载数据
-
-  hive  (default)> load data local inpath '/opt/module/datas/log.data' into table  log_text ;  
-
-（3）查看表中数据大小
-
-  hive  (default)> dfs -du -h /user/hive/warehouse/log_text;  
-
-18.1 M /user/hive/warehouse/log_text/log.data
-
-3．ORC
-
-​    （1）创建表,存储数据格式为ORC
-
-  create  table log_orc(  track_time  string,  url  string,  session_id  string,  referer  string,  ip  string,  end_user_id  string,  city_id  string  )  row  format delimited fields terminated by '\t'  stored  as orc ;  
-
-（2）向表中加载数据
-
-  hive  (default)> insert into table log_orc select * from log_text ;  
-
-（3）查看表中数据大小
-
-  hive  (default)> dfs -du -h /user/hive/warehouse/log_orc/ ;  
-
-2.8 M /user/hive/warehouse/log_orc/000000_0
-
-4．Parquet
-
-（1）创建表,存储数据格式为parquet
-
-  create  table log_parquet(  track_time  string,  url  string,  session_id  string,  referer  string,  ip  string,  end_user_id  string,  city_id  string  )  row  format delimited fields terminated by '\t'  stored  as parquet ;    
-
-（2）向表中加载数据
-
-  hive  (default)> insert into table log_parquet select * from log_text ;  
-
-（3）查看表中数据大小
-
-  hive  (default)> dfs -du -h /user/hive/warehouse/log_parquet/ ;  
-
-13.1 M  /user/hive/warehouse/log_parquet/000000_0
-
-存储文件的压缩比总结:
-
-ORC > Parquet > textFile
-
-**存储文件的查询速度测试:**
-
-1．TextFile
-
-hive (default)> select count(*) from log_text;
-
-_c0
-
-100000
-
-Time taken: 21.54 seconds, Fetched: 1 row(s)
-
-Time taken: 21.08 seconds, Fetched: 1 row(s)
-
-Time taken: 19.298 seconds, Fetched: 1 row(s)
-
-2．ORC
-
-hive (default)> select count(*) from log_orc;
-
-_c0
-
-100000
-
-Time taken: 20.867 seconds, Fetched: 1 row(s)
-
-Time taken: 22.667 seconds, Fetched: 1 row(s)
-
-Time taken: 18.36 seconds, Fetched: 1 row(s)
-
-3．Parquet
-
-hive (default)> select count(*) from log_parquet;
-
-_c0
-
-100000
-
-Time taken: 22.922 seconds, Fetched: 1 row(s)
-
-Time taken: 21.074 seconds, Fetched: 1 row(s)
-
-Time taken: 18.384 seconds, Fetched: 1 row(s)
-
-存储文件的查询速度总结:查询速度相近.
-
-## 8.6 存储和压缩结合
-
-### 8.6.1 修改Hadoop集群具有Snappy压缩方式
-
-1．查看hadoop checknative命令使用
-
-[atguigu@hadoop104 hadoop-2.7.2]$ hadoop
-
-   checknative [-a|-h] check native hadoop and compression libraries availability
-
-2．查看hadoop支持的压缩方式
-
- [atguigu@hadoop104 hadoop-2.7.2]$ hadoop checknative
-
-17/12/24 20:32:52 WARN bzip2.Bzip2Factory: Failed to load/initialize native-bzip2 library system-native, will use pure-Java version
-
-17/12/24 20:32:52 INFO zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
-
-Native library checking:
-
-hadoop: true /opt/module/hadoop-2.7.2/lib/native/libhadoop.so
-
-zlib:  true /lib64/libz.so.1
-
-snappy: false 
-
-lz4:   true revision:99
-
-bzip2:  false
-
-3．将编译好的支持Snappy压缩的hadoop-2.7.2.tar.gz包导入到hadoop102的/opt/software中
-
-4．解压hadoop-2.7.2.tar.gz到当前路径
-
-[atguigu@hadoop102 software]$ tar -zxvf hadoop-2.7.2.tar.gz
-
-5．进入到/opt/software/hadoop-2.7.2/lib/native路径可以看到支持Snappy压缩的动态链接库
-
-[atguigu@hadoop102 native]$ pwd
-
-/opt/software/hadoop-2.7.2/lib/native
-
-[atguigu@hadoop102 native]$ ll
-
--rw-r--r--. 1 atguigu atguigu 472950 9月  1 10:19 libsnappy.a
-
--rwxr-xr-x. 1 atguigu atguigu   955 9月  1 10:19 libsnappy.la
-
-lrwxrwxrwx. 1 atguigu atguigu   18 12月 24 20:39 libsnappy.so -> libsnappy.so.1.3.0
-
-lrwxrwxrwx. 1 atguigu atguigu   18 12月 24 20:39 libsnappy.so.1 -> libsnappy.so.1.3.0
-
--rwxr-xr-x. 1 atguigu atguigu 228177 9月  1 10:19 libsnappy.so.1.3.0
-
-6．拷贝/opt/software/hadoop-2.7.2/lib/native里面的所有内容到开发集群的/opt/module/hadoop-2.7.2/lib/native路径上
-
-[atguigu@hadoop102 native]$ cp ../native/* /opt/module/hadoop-2.7.2/lib/native/
-
-7．分发集群
-
-[atguigu@hadoop102 lib]$ xsync native/
-
-8．再次查看hadoop支持的压缩类型
-
-[atguigu@hadoop102 hadoop-2.7.2]$ hadoop checknative
-
-17/12/24 20:45:02 WARN bzip2.Bzip2Factory: Failed to load/initialize native-bzip2 library system-native, will use pure-Java version
-
-17/12/24 20:45:02 INFO zlib.ZlibFactory: Successfully loaded & initialized native-zlib library
-
-Native library checking:
-
-hadoop: true /opt/module/hadoop-2.7.2/lib/native/libhadoop.so
-
-zlib:  true /lib64/libz.so.1
-
-snappy: true /opt/module/hadoop-2.7.2/lib/native/libsnappy.so.1
-
-lz4:   true revision:99
-
-bzip2:  false
-
-9．重新启动hadoop集群和hive
-
-### 8.6.2 测试存储和压缩
-
-官网:https://cwiki.apache.org/confluence/display/Hive/LanguageManual+ORC
-
-ORC存储方式的压缩:
-
-表6-12
+[官网](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+ORC)
 
 | Key                      | Default    | Notes                                                        |
 | ------------------------ | ---------- | ------------------------------------------------------------ |
@@ -2449,81 +1458,53 @@ ORC存储方式的压缩:
 | orc.bloom.filter.columns | ""         | comma separated list of column names for which  bloom filter should be created |
 | orc.bloom.filter.fpp     | 0.05       | false positive probability for bloom filter  (must >0.0 and <1.0) |
 
-1．创建一个非压缩的的ORC存储方式
+* 创建一个非压缩的的ORC存储方式
 
-​    （1）建表语句
+```mysql
+# 建表语句
+create table log_orc_none(track_time  string,url  string,session_id  string,  referer string,ip string,end_user_id  string,city_id  string) row format delimited fields terminated by '\t' stored as orc tblproperties ("orc.compress"="NONE");
+# 插入数据
+hive(default)> insert into table log_orc_none select * from log_text;
+# 查看插入后数据
+hive(default)> dfs -du -h /user/hive/warehouse/log_orc_none/ ;
+```
 
-  create  table log_orc_none(  track_time  string,  url  string,  session_id  string,  referer  string,  ip  string,  end_user_id  string,  city_id  string  )  row  format delimited fields terminated by '\t'  stored  as orc tblproperties ("orc.compress"="NONE");  
+* 创建一个SNAPPY压缩的ORC存储方式
 
-​    （2）插入数据
+```mysql
+# 建表语句
+create table log_orc_snappy(  track_time string,  url string,  session_id string,  referer string,  ip string,  end_user_id string,  city_id string  )  row format delimited fields terminated by '\t'  stored as orc tblproperties  ("orc.compress"="SNAPPY");
+# 插入数据
+hive  (default)> insert into table log_orc_snappy select * from log_text ;
+# 查看插入后数据
+hive  (default)> dfs -du -h /user/hive/warehouse/log_orc_snappy/ ;
+# 3.8 M  /user/hive/warehouse/log_orc_snappy/000000_0
+```
 
-  hive  (default)> insert into table log_orc_none select * from log_text ;  
+* 默认创建的ORC存储方式,导入数据后大小为:2.8 M,/user/hive/warehouse/log_orc/000000_0,比Snappy压缩的还小.原因是orc存储文件默认采用ZLIB压缩.比snappy压缩的小
+* 存储方式和压缩总结:在实际的项目开发当中,hive表的数据存储格式一般选择:orc或parquet.压缩方式一般选择snappy,lzo.
 
-​    （3）查看插入后数据
 
-  hive  (default)> dfs -du -h /user/hive/warehouse/log_orc_none/ ;  
 
-7.7 M /user/hive/warehouse/log_orc_none/000000_0
+# 优化
 
-2．创建一个SNAPPY压缩的ORC存储方式
 
-​    （1）建表语句
 
-  create table log_orc_snappy(  track_time string,  url string,  session_id string,  referer string,  ip string,  end_user_id string,  city_id string  )  row format delimited fields terminated by '\t'  stored as orc tblproperties  ("orc.compress"="SNAPPY");  
+## Fetch抓取
 
-​    （2）插入数据
+* Fetch抓取是指Hive中对某些情况的查询可以不必使用MapReduce计算.例如:SELECT * FROM employees;在这种情况下,Hive可以简单地读取employee对应的存储目录下的文件,然后输出查询结果到控制台
+* 在hive-default.xml.template文件中hive.fetch.task.conversion默认是more,老版本hive默认是minimal,该属性修改为more以后,在全局查找,字段查找,limit查找等都不走mapreduce
 
-  hive  (default)> insert into table log_orc_snappy select * from log_text ;  
+```xml
+<property>
+    <name>hive.fetch.task.conversion</name>
+    <value>more</value>
+</property>
+```
 
-​    （3）查看插入后数据
 
-  hive  (default)> dfs -du -h /user/hive/warehouse/log_orc_snappy/ ;  
 
-3.8 M  /user/hive/warehouse/log_orc_snappy/000000_0
-
-3．上一节中默认创建的ORC存储方式,导入数据后的大小为
-
-2.8 M /user/hive/warehouse/log_orc/000000_0
-
-比Snappy压缩的还小.原因是orc存储文件默认采用ZLIB压缩.比snappy压缩的小.
-
-4．存储方式和压缩总结
-
-在实际的项目开发当中,hive表的数据存储格式一般选择:orc或parquet.压缩方式一般选择snappy,lzo.
-
-# 第9章 企业级调优
-
-## 9.1 Fetch抓取
-
-Fetch抓取是指,Hive中对某些情况的查询可以不必使用MapReduce计算.例如:SELECT * FROM employees;在这种情况下,Hive可以简单地读取employee对应的存储目录下的文件,然后输出查询结果到控制台.
-
-在hive-default.xml.template文件中hive.fetch.task.conversion默认是more,老版本hive默认是minimal,该属性修改为more以后,在全局查找、字段查找、limit查找等都不走mapreduce.
-
-  <property>      <name>hive.fetch.task.conversion</name>      <value>more</value>      <description>     Expects  one of [none, minimal, more].     Some  select queries can be converted to single FETCH task minimizing latency.      Currently the query should be single sourced  not having any subquery and should not have     any  aggregations or distincts (which incurs RS), lateral views and joins.     0. none  : disable hive.fetch.task.conversion     1.  minimal : SELECT STAR, FILTER on partition columns, LIMIT only     2.  more : SELECT, FILTER, LIMIT only  (support TABLESAMPLE and virtual columns)      </description>     </property>  
-
-案例实操:
-
-​    1）把hive.fetch.task.conversion设置成none,然后执行查询语句,都会执行mapreduce程序.
-
-hive (default)> set hive.fetch.task.conversion=none;
-
-hive (default)> select * from emp;
-
-hive (default)> select ename from emp;
-
-hive (default)> select ename from emp limit 3;
-
-​    2）把hive.fetch.task.conversion设置成more,然后执行查询语句,如下查询方式都不会执行mapreduce程序.
-
-hive (default)> set hive.fetch.task.conversion=more;
-
-hive (default)> select * from emp;
-
-hive (default)> select ename from emp;
-
-hive (default)> select ename from emp limit 3;
-
-## 9.2 本地模式
+## 本地模式
 
 大多数的Hadoop Job是需要Hadoop提供的完整的可扩展性来处理大数据集的.不过,有时Hive的输入数据量是非常小的.在这种情况下,为查询触发执行任务消耗的时间可能会比实际job的执行时间要多的多.对于大多数这种情况,Hive可以通过本地模式在单台机器上处理所有的任务.对于小数据集,执行时间可以明显被缩短.
 
@@ -2549,7 +1530,9 @@ hive (default)> select * from emp cluster by deptno;
 
 Time taken: 20.09 seconds, Fetched: 14 row(s)
 
-## 9.3 表的优化
+
+
+## 表优化
 
 ### 9.3.1 小表、大表Join
 
@@ -2915,7 +1898,9 @@ hive (default)> show partitions ori_partitioned_target;
 
 详见4.6章.
 
-## 9.4 数据倾斜
+
+
+## 数据倾斜
 
 ### 9.4.1 合理设置Map数
 
@@ -2993,7 +1978,9 @@ set mapreduce.job.reduces = 15;
 
 在设置reduce个数的时候也需要考虑这两个原则:处理大数据量利用合适的reduce数;使单个reduce任务处理数据量大小要合适;
 
-## 9.5 并行执行
+
+
+## 并行执行
 
 Hive会将一个查询转化成一个或者多个阶段.这样的阶段可以是MapReduce阶段、抽样阶段、合并阶段、limit阶段.或者Hive执行过程中可能需要的其他阶段.默认情况下,Hive一次只会执行一个阶段.不过,某个特定的job可能包含众多的阶段,而这些阶段可能并非完全互相依赖的,也就是说有些阶段是可以并行执行的,这样可能使得整个job的执行时间缩短.不过,如果有更多的阶段可以并行执行,那么job可能就越快完成.
 
@@ -3005,7 +1992,9 @@ set hive.exec.parallel.thread.number=16; //同一个sql允许最大并行度,默
 
 当然,得是在系统资源比较空闲的时候才有优势,否则,没资源,并行也起不来.
 
-## 9.6 严格模式
+
+
+## 严格模式
 
 Hive提供了一个严格模式,可以防止用户执行那些可能意想不到的不好的影响的查询.
 
@@ -3043,7 +2032,9 @@ Hive提供了一个严格模式,可以防止用户执行那些可能意想不到
 
 3)    限制笛卡尔积的查询.对关系型数据库非常了解的用户可能期望在执行JOIN查询的时候不使用ON语句而是使用where语句,这样关系数据库的执行优化器就可以高效地将WHERE语句转化成那个ON语句.不幸的是,Hive并不会执行这种优化,因此,如果表足够大,那么这个查询就会出现不可控的情况.
 
-## 9.7 JVM重用
+
+
+## JVM重用
 
 JVM重用是Hadoop调优参数的内容,其对Hive的性能具有非常大的影响,特别是对于很难避免小文件的场景或task特别多的场景,这类场景大多数执行时间都很短.
 
@@ -3065,7 +2056,9 @@ Hadoop的默认配置通常是使用派生JVM来执行map和Reduce任务的.这�
 
 这个功能的缺点是,开启JVM重用将一直占用使用到的task插槽,以便进行重用,直到任务完成后才能释放.如果某个“不平衡的”job中有某几个reduce task执行的时间要比其他Reduce task消耗的时间多的多的话,那么保留的插槽就会一直空闲着却无法被其他的job使用,直到所有的task都结束了才会释放.
 
-## 9.8 推测执行
+
+
+## 推测执行
 
 在分布式集群环境下,因为程序Bug（包括Hadoop本身的bug）,负载不均衡或者资源分布不均等原因,会造成同一个作业的多个任务之间运行速度不一致,有些任务的运行速度可能明显慢于其他任务（比如一个作业的某个任务进度只有50%,而其他所有任务已经运行完毕）,则这些任务会拖慢作业的整体执行进度.为了避免这种情况发生,Hadoop采用了推测执行（Speculative Execution）机制,它根据一定的法则推测出“拖后腿”的任务,并为这样的任务启动一个备份任务,让该任务与原始任务同时处理同一份数据,并最终选用最先成功运行完成任务的计算结果作为最终结果.
 
@@ -3079,11 +2072,15 @@ Hadoop的默认配置通常是使用派生JVM来执行map和Reduce任务的.这�
 
 关于调优这些推测执行变量,还很难给一个具体的建议.如果用户对于运行时的偏差非常敏感的话,那么可以将这些功能关闭掉.如果用户因为输入数据量很大而需要执行长时间的map或者Reduce task的话,那么启动推测执行造成的浪费是非常巨大大.
 
-## 9.9 压缩
 
-详见第8章.
 
-## 9.10 执行计划（Explain）
+## 压缩
+
+* 详见压缩
+
+
+
+## 执行计划
 
 1．基本语法
 
