@@ -1,6 +1,6 @@
 # Hive
 
-
+看到视频28
 
 # 概述
 
@@ -444,736 +444,561 @@ hive (default)> use db_hive;
 
 
 
-看到视频28
+* 使用ALTER DATABASE为某个数据库的DBPROPERTIES设置键值对属性值,来描述这个数据库的属性信息.数据库的其他元数据信息都是不可更改的,包括数据库名和数据库所在的目录位置
 
-用户可以使用ALTER DATABASE命令为某个数据库的DBPROPERTIES设置键-值对属性值,来描述这个数据库的属性信息.数据库的其他元数据信息都是不可更改的,包括数据库名和数据库所在的目录位置.
-
-hive (default)> alter database db_hive set dbproperties('createtime'='20170830');
-
-在hive中查看修改结果
-
+```mysql
+hive(default)>alter database db_hive set dbproperties('createtime'='20170830');
+# 在hive中查看修改结果
 hive> desc database extended db_hive;
+# db_name comment location    owner_name   owner_type   parameters
+# db_hive     hdfs://hadoop102:8020/user/hive/warehouse/db_hive.db  atguigu USER  {createtime=20170830}
+```
 
-db_name comment location    owner_name   owner_type   parameters
 
-db_hive     hdfs://hadoop102:8020/user/hive/warehouse/db_hive.db  atguigu USER  {createtime=20170830}
 
-## 4.4 删除数据库
+## 删除数据库
 
-1．删除空数据库
+* 删除空数据库:hive>drop database db_hive2;
+* 如果删除的数据库不存在,最好采用 if exists判断数据库是否存在
 
-hive>drop database db_hive2;
-
-2．如果删除的数据库不存在,最好采用 if exists判断数据库是否存在
-
+```mysql
 hive> drop database db_hive;
-
 FAILED: SemanticException [Error 10072]: Database does not exist: db_hive
-
 hive> drop database if exists db_hive2;
+```
 
-3．如果数据库不为空,可以采用cascade命令,强制删除
+* 如果数据库不为空,可以采用cascade命令,强制删除
 
+```mysql
 hive> drop database db_hive;
-
 FAILED: Execution Error, return code 1 from org.apache.hadoop.hive.ql.exec.DDLTask. InvalidOperationException(message:Database db_hive is not empty. One or more tables exist.)
-
 hive> drop database db_hive cascade;
+```
 
-## 4.5 创建表
 
-1．建表语法
 
+## 创建表
+
+* 建表语法
+
+```mysql
 CREATE [EXTERNAL] TABLE [IF NOT EXISTS] table_name
-
 [(col_name data_type [COMMENT col_comment], ...)] 
-
 [COMMENT table_comment]
-
 [PARTITIONED BY (col_name data_type [COMMENT col_comment], ...)] 
-
 [CLUSTERED BY (col_name, col_name, ...) 
-
 [SORTED BY (col_name [ASC|DESC], ...)] INTO num_buckets BUCKETS] 
-
 [ROW FORMAT row_format] 
-
 [STORED AS file_format]
-
 [LOCATION hdfs_path]
-
-2．字段解释说明
-
-（1）CREATE TABLE 创建一个指定名字的表.如果相同名字的表已经存在,则抛出异常;用户可以用 IF NOT EXISTS 选项来忽略这个异常.
-
-（2）EXTERNAL关键字可以让用户创建一个外部表,在建表的同时指定一个指向实际数据的路径（LOCATION）,Hive创建内部表时,会将数据移动到数据仓库指向的路径;若创建外部表,仅记录数据所在的路径,不对数据的位置做任何改变.在删除表的时候,内部表的元数据和数据会被一起删除,而外部表只删除元数据,不删除数据.
-
-（3）COMMENT:为表和列添加注释.
-
-（4）PARTITIONED BY创建分区表
-
-（5）CLUSTERED BY创建分桶表
-
-（6）SORTED BY不常用
-
-（7）ROW FORMAT 
-
-DELIMITED [FIELDS TERMINATED BY char] [COLLECTION ITEMS TERMINATED BY char]
-
-​    [MAP KEYS TERMINATED BY char] [LINES TERMINATED BY char] 
-
-  | SERDE serde_name [WITH SERDEPROPERTIES (property_name=property_value, property_name=property_value, ...)]
-
-用户在建表的时候可以自定义SerDe或者使用自带的SerDe.如果没有指定ROW FORMAT 或者ROW FORMAT DELIMITED,将会使用自带的SerDe.在建表的时候,用户还需要为表指定列,用户在指定表的列的同时也会指定自定义的SerDe,Hive通过SerDe确定表的具体的列的数据.
-
-SerDe是Serialize/Deserilize的简称,目的是用于序列化和反序列化.
-
-（8）STORED AS指定存储文件类型
-
-常用的存储文件类型:SEQUENCEFILE（二进制序列文件）、TEXTFILE（文本）、RCFILE（列式存储格式文件）
-
-如果文件数据是纯文本,可以使用STORED AS TEXTFILE.如果数据需要压缩,使用 STORED AS SEQUENCEFILE.
-
-（9）LOCATION :指定表在HDFS上的存储位置.
-
-（10）LIKE允许用户复制现有的表结构,但是不复制数据.
-
-### 4.5.1 管理表
-
-1．理论
-
-默认创建的表都是所谓的管理表,有时也被称为内部表.因为这种表,Hive会（或多或少地）控制着数据的生命周期.Hive默认情况下会将这些表的数据存储在由配置项hive.metastore.warehouse.dir(例如,/user/hive/warehouse)所定义的目录的子目录下.  当我们删除一个管理表时,Hive也会删除这个表中数据.管理表不适合和其他工具共享数据.
-
-2．案例实操
-
-（1）普通创建表
-
-​    create table if not exists student2(  id int, name string  )  row format delimited fields terminated by '\t'  stored as textfile  location '/user/hive/warehouse/student2';    
-
-（2）根据查询结果创建表（查询的结果会添加到新创建的表中）
-
-  create table if not  exists student3 as select id, name from student;  
-
-（3）根据已经存在的表结构创建表
-
-​    create  table if not exists student4 like student;    
-
-（4）查询表的类型
-
-hive (default)> desc formatted student2;
-
-Table Type:       MANAGED_TABLE 
-
-### 4.5.2 外部表
-
-1．理论
-
-因为表是外部表,所以Hive并非认为其完全拥有这份数据.删除该表并不会删除掉这份数据,不过描述表的元数据信息会被删除掉.
-
-2．管理表和外部表的使用场景
-
-每天将收集到的网站日志定期流入HDFS文本文件.在外部表（原始日志表）的基础上做大量的统计分析,用到的中间表、结果表使用内部表存储,数据通过SELECT+INSERT进入内部表.
-
-3．案例实操
-
-分别创建部门和员工外部表,并向表中导入数据.
-
-（1）原始数据
-
-```
-# depart.txt
-10	ACCOUNTING	1700
-20	RESEARCH	1800
-30	SALES	1900
-40	OPERATIONS	1700
-# emp.txt
-7369	SMITH	CLERK	7902	1980-12-17	800.00		20
-7499	ALLEN	SALESMAN	7698	1981-2-20	1600.00	300.00	30
-7521	WARD	SALESMAN	7698	1981-2-22	1250.00	500.00	30
-7566	JONES	MANAGER	7839	1981-4-2	2975.00		20
-7654	MARTIN	SALESMAN	7698	1981-9-28	1250.00	1400.00	30
-7698	BLAKE	MANAGER	7839	1981-5-1	2850.00		30
-7782	CLARK	MANAGER	7839	1981-6-9	2450.00		10
-7788	SCOTT	ANALYST	7566	1987-4-19	3000.00		20
-7839	KING	PRESIDENT		1981-11-17	5000.00		10
-7844	TURNER	SALESMAN	7698	1981-9-8	1500.00	0.00	30
-7876	ADAMS	CLERK	7788	1987-5-23	1100.00		20
-7900	JAMES	CLERK	7698	1981-12-3	950.00		30
-7902	FORD	ANALYST	7566	1981-12-3	3000.00		20
-7934	MILLER	CLERK	7782	1982-1-23	1300.00		10
 ```
 
+* 字段解释说明
+* CREATE TABLE:创建一个指定名字的表.如果相同名字的表已经存在,则抛出异常
+* EXTERNAL:让用户创建一个外部表,在建表的同时指定一个指向实际数据的路径(LOCATION)
+  * Hive创建内部表时,会将数据移动到数据仓库指向的路径
+  * 若创建外部表,仅记录数据所在的路径,不对数据的位置做任何改变
+  * 在删除表的时候,内部表的元数据和数据会被一起删除,而外部表只删除元数据,不删除数据
+* COMMENT:为表和列添加注释
+* PARTITIONED BY:创建分区表
+* CLUSTERED BY:创建分桶表
+* SORTED BY:不常用
+* ROW FORMAT DELIMITED [FIELDS TERMINATED BY char] [COLLECTION ITEMS TERMINATED BY char] [MAP KEYS TERMINATED BY char] [LINES TERMINATED BY char]  | SERDE serde_name [WITH SERDEPROPERTIES (property_name=property_value, property_name=property_value, ...)]:用户在建表的时候可以自定义SerDe或者使用自带的SerDe.如果没有指定ROW FORMAT 或者ROW FORMAT DELIMITED,将会使用自带的SerDe.在建表的时候,用户还需要为表指定列,用户在指定表的列的同时也会指定自定义的SerDe,Hive通过SerDe确定表的具体的列的数据
+  * SerDe是Serialize/Deserilize的简称,目的是用于序列化和反序列化
+* STORED AS:指定存储文件类型,常用的存储文件类型:SEQUENCEFILE(二进制序列文件),TEXTFILE(文本),RCFILE(列式存储格式文件).如果文件数据是纯文本,可以使用STORED AS TEXTFILE.如果数据需要压缩,使用 STORED AS SEQUENCEFILE
+* LOCATION:指定表在HDFS上的存储位置
+* LIKE:允许用户复制现有的表结构,但是不复制数据
 
 
-​    （2）建表语句
 
-​       创建部门表
+## 管理表
 
-  create  external table if not exists default.dept(  deptno  int,  dname  string,  loc  int  )  row  format delimited fields terminated by '\t';  
+* 默认创建的表都是所谓的管理表,有时也被称为内部表.因为这种表,Hive会（或多或少地）控制着数据的生命周期.Hive默认情况下会将这些表的数据存储在由配置项hive.metastore.warehouse.dir(例如,/user/hive/warehouse)所定义的目录的子目录下.  当我们删除一个管理表时,Hive也会删除这个表中数据.管理表不适合和其他工具共享数据
 
-​       创建员工表
+* 案例实操
 
-  create external table if not exists default.emp(  empno  int,  ename  string,  job  string,  mgr  int,  hiredate  string,   sal  double,   comm  double,  deptno  int)  row  format delimited fields terminated by '\t';  
+  * 普通创建表
 
-（3）查看创建的表
+  ```mysql
+  create table if not exists student2(  id int, name string  )  row format delimited fields terminated by '\t'  stored as textfile  location '/user/hive/warehouse/student2';
+  ```
 
-hive (default)> show tables;
+  * 根据查询结果创建表,查询的结果会添加到新创建的表中
 
-OK
+  ```mysql
+   create table if not  exists student3 as select id, name from student; 
+  ```
 
-tab_name
+  * 根据已经存在的表结构创建表
 
-dept
+  ```mysql
+  create  table if not exists student4 like student; 
+  ```
 
-emp
+  * 查询表的类型
 
-​    （4）向外部表中导入数据
+  ```mysql
+  hive (default)> desc formatted student2;
+  # Table Type:       MANAGED_TABLE 
+  ```
 
-​       导入数据
 
-hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept;
 
-hive (default)> load data local inpath '/opt/module/datas/emp.txt' into table default.emp;
+## 外部表
 
-查询结果
+* 因为表是外部表,所以Hive并非认为其完全拥有这份数据.删除该表并不会删除掉这份数据,不过描述表的元数据信息会被删除掉
 
-hive (default)> select * from emp;
+* 管理表和外部表的使用场景:每天将收集到的网站日志定期流入HDFS文本文件.在外部表（原始日志表）的基础上做大量的统计分析,用到的中间表、结果表使用内部表存储,数据通过SELECT+INSERT进入内部表
 
-hive (default)> select * from dept;
+* 案例实操
 
-​    （5）查看表格式化数据
+  * 分别创建部门和员工外部表,并向表中导入数据,原始数据如下
 
-hive (default)> desc formatted dept;
+  ```
+  # depart.txt
+  10	ACCOUNTING	1700
+  20	RESEARCH	1800
+  30	SALES	1900
+  40	OPERATIONS	1700
+  # emp.txt
+  7369	SMITH	CLERK	7902	1980-12-17	800.00		20
+  7499	ALLEN	SALESMAN	7698	1981-2-20	1600.00	300.00	30
+  7521	WARD	SALESMAN	7698	1981-2-22	1250.00	500.00	30
+  7566	JONES	MANAGER	7839	1981-4-2	2975.00		20
+  7654	MARTIN	SALESMAN	7698	1981-9-28	1250.00	1400.00	30
+  7698	BLAKE	MANAGER	7839	1981-5-1	2850.00		30
+  7782	CLARK	MANAGER	7839	1981-6-9	2450.00		10
+  7788	SCOTT	ANALYST	7566	1987-4-19	3000.00		20
+  7839	KING	PRESIDENT		1981-11-17	5000.00		10
+  7844	TURNER	SALESMAN	7698	1981-9-8	1500.00	0.00	30
+  7876	ADAMS	CLERK	7788	1987-5-23	1100.00		20
+  7900	JAMES	CLERK	7698	1981-12-3	950.00		30
+  7902	FORD	ANALYST	7566	1981-12-3	3000.00		20
+  7934	MILLER	CLERK	7782	1982-1-23	1300.00		10
+  ```
 
-Table Type:       EXTERNAL_TABLE
+  * 建表语句
 
-### 4.5.3 管理表与外部表的互相转换
+  ```mysql
+  # 创建部门表
+  create  external table if not exists default.dept(deptno int,dname string, loc int) row format delimited fields terminated by '\t';
+  # 创建员工表
+  create external table if not exists default.emp(empno int,ename string,job  string,mgr int,hiredate string,sal double,comm double,deptno int)  row  format delimited fields terminated by '\t'; 
+  ```
 
-（1）查询表的类型
+  * 查看创建的表:hive (default)> show tables;
+  * 向外部表中导入数据
 
-hive (default)> desc formatted student2;
+  ```mysql
+  hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept;
+  hive (default)> load data local inpath '/opt/module/datas/emp.txt' into table default.emp
+  ```
 
-Table Type:       MANAGED_TABLE
+  * 查看表格式化数据:hive (default)> desc formatted dept;
 
-（2）修改内部表student2为外部表
 
-alter table student2 set tblproperties('EXTERNAL'='TRUE');
 
-（3）查询表的类型
+## 管理表与外部表转换
 
-hive (default)> desc formatted student2;
+* 查询表的类型:hive (default)> desc formatted student2;
+* 修改内部表student2为外部表:alter table student2 set tblproperties('EXTERNAL'='TRUE');
+* 查询表的类型:hive (default)> desc formatted student2;
+* 修改外部表student2为内部表:alter table student2 set tblproperties('EXTERNAL'='FALSE');
+* 查询表的类型:hive (default)> desc formatted student2;
+* ('EXTERNAL'='TRUE')和('EXTERNAL'='FALSE')为固定写法,区分大小写
 
-Table Type:       EXTERNAL_TABLE
 
-（4）修改外部表student2为内部表
 
-alter table student2 set tblproperties('EXTERNAL'='FALSE');
+## 分区表
 
-（5）查询表的类型
 
-hive (default)> desc formatted student2;
 
-Table Type:       MANAGED_TABLE
+> 分区表实际上就是对应一个HDFS文件系统上的独立的文件夹,该文件夹下是该分区所有的数据文件.Hive中的分区就是分目录,把一个大的数据集根据业务需要分割成小的数据集.在查询时通过WHERE子句中的表达式选择查询所需要的指定的分区,这样的查询效率会提高很多
 
-注意:('EXTERNAL'='TRUE')和('EXTERNAL'='FALSE')为固定写法,区分大小写！
 
-## 4.6 分区表
 
-分区表实际上就是对应一个HDFS文件系统上的独立的文件夹,该文件夹下是该分区所有的数据文件.Hive中的分区就是分目录,把一个大的数据集根据业务需要分割成小的数据集.在查询时通过WHERE子句中的表达式选择查询所需要的指定的分区,这样的查询效率会提高很多.
+### 基本操作
 
-### 4.6.1 分区表基本操作
+* 引入分区表,需要根据日期对日志进行管理
 
-1．引入分区表（需要根据日期对日志进行管理）
-
+```shell
 /user/hive/warehouse/log_partition/20170702/20170702.log
-
 /user/hive/warehouse/log_partition/20170703/20170703.log
-
 /user/hive/warehouse/log_partition/20170704/20170704.log
+```
 
-2．创建分区表语法
+* 创建分区表语法
 
-  hive (default)> create table dept_partition(  deptno int, dname string, loc string  )  partitioned by (month string)  row format delimited fields terminated by '\t';  
+```mysql
+hive (default)> create table dept_partition(  deptno int, dname string, loc string  )  partitioned by (month string)  row format delimited fields terminated by '\t'; 
+```
 
-3．加载数据到分区表中
+* 加载数据到分区表中
 
+```mysql
 hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept_partition partition(month='201709');
-
 hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept_partition partition(month='201708');
-
 hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept_partition partition(month='201707’);
+```
 
-![img](file:///C:/Users/paradise/AppData/Local/Temp/msohtmlclip1/01/clip_image008.jpg)
+* 查询分区表中数据
 
-图6-5 加载数据到分区表
-
-![img](file:///C:/Users/paradise/AppData/Local/Temp/msohtmlclip1/01/clip_image010.jpg)
-
-图6-6 分区表
-
-4．查询分区表中数据
-
-​    单分区查询
-
+```mysql
+# 单分区查询
 hive (default)> select * from dept_partition where month='201709';
-
-多分区联合查询
-
+# 多分区联合查询
 hive (default)> select * from dept_partition where month='201709'
+union select * from dept_partition where month='201708'
+union select * from dept_partition where month='201707';
 
-​       union
+# _u3.deptno   _u3.dname    _u3.loc _u3.month
+# 10   ACCOUNTING   NEW YORK    201707
+# 10   ACCOUNTING   NEW YORK    201708
+# 10   ACCOUNTING   NEW YORK    201709
+# 20   RESEARCH    DALLAS 201707
+# 20   RESEARCH    DALLAS 201708
+# 20   RESEARCH    DALLAS 201709
+# 30   SALES  CHICAGO 201707
+# 30   SALES  CHICAGO 201708
+# 30   SALES  CHICAGO 201709
+# 40   OPERATIONS   BOSTON 201707
+# 40   OPERATIONS   BOSTON 201708
+# 40   OPERATIONS   BOSTON 201709
+```
 
-​       select * from dept_partition where month='201708'
+* 增加分区
 
-​       union
-
-​       select * from dept_partition where month='201707';
-
- 
-
-_u3.deptno   _u3.dname    _u3.loc _u3.month
-
-10   ACCOUNTING   NEW YORK    201707
-
-10   ACCOUNTING   NEW YORK    201708
-
-10   ACCOUNTING   NEW YORK    201709
-
-20   RESEARCH    DALLAS 201707
-
-20   RESEARCH    DALLAS 201708
-
-20   RESEARCH    DALLAS 201709
-
-30   SALES  CHICAGO 201707
-
-30   SALES  CHICAGO 201708
-
-30   SALES  CHICAGO 201709
-
-40   OPERATIONS   BOSTON 201707
-
-40   OPERATIONS   BOSTON 201708
-
-40   OPERATIONS   BOSTON 201709
-
-5．增加分区
-
-​    创建单个分区
-
+```mysql
+# 创建单个分区
 hive (default)> alter table dept_partition add partition(month='201706') ;
-
-​    同时创建多个分区
-
+# 同时创建多个分区
 hive (default)> alter table dept_partition add partition(month='201705') partition(month='201704');
+```
 
-6．删除分区
+* 删除分区
 
-​    删除单个分区
-
+```mysql
+# 删除单个分区
 hive (default)> alter table dept_partition drop partition (month='201704');
-
-同时删除多个分区
-
+# 同时删除多个分区
 hive (default)> alter table dept_partition drop partition (month='201705'), partition (month='201706');
+```
 
-7．查看分区表有多少分区
-
-hive> show partitions dept_partition;
-
-8．查看分区表结构
-
-hive> desc formatted dept_partition;
+* 查看分区表有多少分区:hive> show partitions dept_partition;
+* 查看分区表结构:hive> desc formatted dept_partition;
 
  
 
-\# Partition Information     
+### 注意事项
 
-\# col_name       data_type        comment       
+* 创建二级分区表
 
-month          string  
+```mysql
+hive (default)> create table dept_partition2(deptno int, dname string, loc string) partitioned by (month string, day string) row format delimited fields terminated by '\t';  
+```
 
-### 4.6.2 分区表注意事项
+* 正常的加载数据
 
-1．创建二级分区表
+  * 加载数据到二级分区表中
 
-  hive (default)> create table dept_partition2(           deptno int, dname string, loc string           )           partitioned by (month string, day string)           row format delimited fields terminated by '\t';  
+  ```mysql
+  hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept_partition2 partition(month='201709', day='13');
+  ```
 
-2．正常的加载数据
+  * 查询分区数据
 
-（1）加载数据到二级分区表中
+  ```mysql
+  hive (default)> select * from dept_partition2 where month='201709' and day='13';
+  ```
 
-hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table
+* 把数据直接上传到分区目录上,让分区表和数据产生关联的三种方式
 
- default.dept_partition2 partition(month='201709', day='13');
+  * 方式一:上传数据后修复
 
-（2）查询分区数据
+  ```mysql
+  # 上传数据
+  hive (default)> dfs -mkdir -p
+   /user/hive/warehouse/dept_partition2/month=201709/day=12;
+  hive (default)> dfs -put /opt/module/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=12;
+  # 查询数据（查询不到刚上传的数据）
+  hive (default)> select * from dept_partition2 where month='201709' and day='12';
+  # 执行修复命令
+  hive> msck repair table dept_partition2;
+  # 再次查询数据
+  hive (default)> select * from dept_partition2 where month='201709' and day='12';
+  ```
 
-hive (default)> select * from dept_partition2 where month='201709' and day='13';
+  * 方式二:上传数据后添加分区
 
-3．把数据直接上传到分区目录上,让分区表和数据产生关联的三种方式
+  ```mysql
+  # 上传数据
+  hive (default)> dfs -mkdir -p
+   /user/hive/warehouse/dept_partition2/month=201709/day=11;
+  hive (default)> dfs -put /opt/module/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=11;
+  # 执行添加分区
+   hive (default)> alter table dept_partition2 add partition(month='201709',
+   day='11');
+  # 查询数据
+  hive (default)> select * from dept_partition2 where month='201709' and day='11';
+  ```
 
-（1）方式一:上传数据后修复
+  * 方式三:创建文件夹后load数据到分区
 
-​    上传数据
+  ```mysql
+  # 创建目录
+  hive (default)> dfs -mkdir -p
+   /user/hive/warehouse/dept_partition2/month=201709/day=10;
+  # 上传数据
+  hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table dept_partition2 partition(month='201709',day='10');
+  # 查询数据
+  hive (default)> select * from dept_partition2 where month='201709' and day='10';
+  ```
 
-hive (default)> dfs -mkdir -p
 
- /user/hive/warehouse/dept_partition2/month=201709/day=12;
 
-hive (default)> dfs -put /opt/module/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=12;
+## 修改表
 
-​    查询数据（查询不到刚上传的数据）
+### 重命名表
 
-hive (default)> select * from dept_partition2 where month='201709' and day='12';
+* ALTER TABLE table_name RENAME TO new_table_name
 
-执行修复命令
+### 增加/修改/替换列信息
 
-hive> msck repair table dept_partition2;
+* 更新列:ALTER TABLE table_name CHANGE [COLUMN] col_old_name col_new_name column_type [COMMENT col_comment] [FIRST|AFTER column_name]
+* 增加和替换列:ALTER TABLE table_name ADD|REPLACE COLUMNS (col_name data_type [COMMENT col_comment], ...) 
+* ADD表示新增一字段,字段位置在所有列后面(partition列前),REPLACE则是表示替换表中所有字段
 
-再次查询数据
-
-hive (default)> select * from dept_partition2 where month='201709' and day='12';
-
-​    （2）方式二:上传数据后添加分区
-
-​    上传数据
-
-hive (default)> dfs -mkdir -p
-
- /user/hive/warehouse/dept_partition2/month=201709/day=11;
-
-hive (default)> dfs -put /opt/module/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=11;
-
-​    执行添加分区
-
- hive (default)> alter table dept_partition2 add partition(month='201709',
-
- day='11');
-
-​    查询数据
-
-hive (default)> select * from dept_partition2 where month='201709' and day='11';
-
-​    （3）方式三:创建文件夹后load数据到分区
-
-​       创建目录
-
-hive (default)> dfs -mkdir -p
-
- /user/hive/warehouse/dept_partition2/month=201709/day=10;
-
-上传数据
-
-hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table
-
- dept_partition2 partition(month='201709',day='10');
-
-查询数据
-
-hive (default)> select * from dept_partition2 where month='201709' and day='10';
-
-## 4.7 修改表
-
-### 4.7.1 重命名表
-
-1．语法
-
-ALTER TABLE table_name RENAME TO new_table_name
-
-2．实操案例
-
-hive (default)> alter table dept_partition2 rename to dept_partition3;
-
-### 4.7.2 增加、修改和删除表分区
-
-详见4.6.1分区表基本操作.
-
-### 4.7.3 增加/修改/替换列信息
-
-1．语法
-
-​    更新列
-
-ALTER TABLE table_name CHANGE [COLUMN] col_old_name col_new_name column_type [COMMENT col_comment] [FIRST|AFTER column_name]
-
-增加和替换列
-
-ALTER TABLE table_name ADD|REPLACE COLUMNS (col_name data_type [COMMENT col_comment], ...) 
-
-注:ADD是代表新增一字段,字段位置在所有列后面(partition列前),REPLACE则是表示替换表中所有字段.
-
-2．实操案例
-
-（1）查询表结构
-
+```mysql
+# 查询表结构
 hive> desc dept_partition;
-
-（2）添加列
-
+# 添加列
 hive (default)> alter table dept_partition add columns(deptdesc string);
-
-（3）查询表结构
-
+# 查询表结构
 hive> desc dept_partition;
-
-（4）更新列
-
+# 更新列
 hive (default)> alter table dept_partition change column deptdesc desc int;
-
-（5）查询表结构
-
+# 查询表结构
 hive> desc dept_partition;
-
-（6）替换列
-
+# 替换列
 hive (default)> alter table dept_partition replace columns(deptno string, dname
-
  string, loc string);
-
-（7）查询表结构
-
+# 查询表结构
 hive> desc dept_partition;
+```
 
-## 4.8 删除表
 
-hive (default)> drop table dept_partition;
 
-# 第5章 DML数据操作
+## 删除表
 
-## 5.1 数据导入
+* hive (default)> drop table dept_partition;
 
-### 5.1.1 向表中装载数据（Load）
 
-1．语法
 
-hive> load data [local] inpath '/opt/module/datas/student.txt' overwrite | into table student [partition (partcol1=val1,…)];
+# DML数据操作
 
-（1）load data:表示加载数据
 
-（2）local:表示从本地加载数据到hive表;否则从HDFS加载数据到hive表
 
-（3）inpath:表示加载数据的路径
+## 数据导入
 
-（4）overwrite:表示覆盖表中已有数据,否则表示追加
+### Load
 
-（5）into table:表示加载到哪张表
+* 向表中装载数据
 
-（6）student:表示具体的表
+* hive> load data [local] inpath '/opt/module/datas/student.txt' overwrite | into table student [partition (partcol1=val1,…)];
+  * load data:表示加载数据
+  * local:表示从本地加载数据到hive表;否则从HDFS加载数据到hive表
+  * inpath:表示加载数据的路径
+  * overwrite:表示覆盖表中已有数据,否则表示追加
+  * into table:表示加载到哪张表
+  * student:表示具体的表
+  * partition:表示上传到指定分区
+* 案例
 
-（7）partition:表示上传到指定分区
-
-2．实操案例
-
-​    （0）创建一张表
-
+```mysql
+# 1.创建一张表
 hive (default)> create table student(id string, name string) row format delimited fields terminated by '\t';
-
-（1）加载本地文件到hive
-
+# 2.加载本地文件到hive
 hive (default)> load data local inpath '/opt/module/datas/student.txt' into table default.student;
-
-（2）加载HDFS文件到hive中
-
-​    上传文件到HDFS
-
+# 3.加载HDFS文件到hive中
+# 上传文件到HDFS
 hive (default)> dfs -put /opt/module/datas/student.txt /user/atguigu/hive;
-
-加载HDFS上数据
-
+# 加载HDFS上数据
 hive (default)> load data inpath '/user/atguigu/hive/student.txt' into table default.student;
-
-（3）加载数据覆盖表中已有的数据
-
-上传文件到HDFS
-
+# 4.加载数据覆盖表中已有的数据
+# 上传文件到HDFS
 hive (default)> dfs -put /opt/module/datas/student.txt /user/atguigu/hive;
-
-加载数据覆盖表中已有的数据
-
+# 加载数据覆盖表中已有的数据
 hive (default)> load data inpath '/user/atguigu/hive/student.txt' overwrite into table default.student;
+```
 
-### 5.1.2 通过查询语句向表中插入数据（Insert）
 
-1．创建一张分区表
 
+### Insert
+
+* 查询语句向表中插入数据
+* 创建一张分区表
+
+```mysql
 hive (default)> create table student(id int, name string) partitioned by (month string) row format delimited fields terminated by '\t';
+```
 
-2．基本插入数据
+* 基本数据插入
 
+```mysql
 hive (default)> insert into table student partition(month='201709') values(1,'wangwu');
+```
 
-3．基本模式插入（根据单张表查询结果）
+* 基本模式插入:单张表结果插入
 
+```mysql
 hive (default)> insert overwrite table student partition(month='201708')
+select id, name from student where month='201709';
+```
 
-​       select id, name from student where month='201709';
+* 多插入模式:多张表结果插入
 
-4．多插入模式（根据多张表查询结果）
-
+```mysql
 hive (default)> from student
+insert overwrite table student partition(month='201707')
+select id, name where month='201709'
+insert overwrite table student partition(month='201706')
+select id, name where month='201709';
+```
 
-​       insert overwrite table student partition(month='201707')
 
-​       select id, name where month='201709'
 
-​       insert overwrite table student partition(month='201706')
+### As Select
 
-​       select id, name where month='201709';
+* 查询语句中创建表并加载数据,见创建表
+* 根据查询结果创建表,查询的结果会添加到新创建的表中
 
-### 5.1.3 查询语句中创建表并加载数据（As Select）
 
-详见4.5.1章创建表.
 
-根据查询结果创建表（查询的结果会添加到新创建的表中）
+### Location
 
-create table if not exists student3
+* 创建表时通过Location指定加载数据路径
+* 创建表,并指定在hdfs上的位置
 
-as select id, name from student;
+```mysql
+hive (default)> create table if not exists student5(id int, name string)
+row format delimited fields terminated by '\t'
+location '/user/hive/warehouse/student5';
+```
 
-### 5.1.4 创建表时通过Location指定加载数据路径
+* 上传数据到hdfs上
 
-1．创建表,并指定在hdfs上的位置
+```mysql
+hive(default)>dfs -put /app/hive/datas/student.txt user/hive/warehouse/student5
+```
 
-hive (default)> create table if not exists student5(
+* 查询数据:hive (default)> select * from student5
 
-​       id int, name string
 
-​       )
 
-​       row format delimited fields terminated by '\t'
+### Import
 
-​       location '/user/hive/warehouse/student5';
+* 先用export导出后,再将数据导入
 
-2．上传数据到hdfs上
-
-hive (default)> dfs -put /opt/module/datas/student.txt
-
-/user/hive/warehouse/student5;
-
-3．查询数据
-
-hive (default)> select * from student5;
-
-### 5.1.5 Import数据到指定Hive表中
-
-注意:先用export导出后,再将数据导入.
-
+```mysql
 hive (default)> import table student2 partition(month='201709') from
-
  '/user/hive/warehouse/export/student';
+```
 
-## 5.2 数据导出
 
-### 5.2.1 Insert导出
 
-1．将查询的结果导出到本地
+## 数据导出
 
-hive (default)> insert overwrite local directory '/opt/module/datas/export/student'
+### Insert
 
-​      select * from student;
+* 将查询的结果导出到本地
+* 将查询的结果格式化导出到本地
+* 将查询的结果导出到HDFS上,没有local
 
-2．将查询的结果格式化导出到本地
+```mysql
+hive(default)>insert overwrite local directory '/app/hive/datas/export/student' select * from student;
+hive(default)>insert overwrite local directory '/app/hive/datas/export/student1'
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' select * from student;
+hive(default)>insert overwrite directory '/user/atguigu/student2'
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' select * from student;
+```
 
-hive(default)>insert overwrite local directory '/opt/module/datas/export/student1'
 
-​      ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'       select * from student;
 
-3．将查询的结果导出到HDFS上(没有local)
+### Hadoop命令导出
 
-hive (default)> insert overwrite directory '/user/atguigu/student2'
-
-​       ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' 
-
-​       select * from student;
-
-### 5.2.2 Hadoop命令导出到本地
-
+```mysql
 hive (default)> dfs -get /user/hive/warehouse/student/month=201709/000000_0
-
-/opt/module/datas/export/student3.txt;
-
-### 5.2.3 Hive Shell 命令导出
-
-基本语法:（hive -f/-e 执行语句或者脚本 > file）
-
-[atguigu@hadoop102 hive]$ bin/hive -e 'select * from default.student;' >
-
- /opt/module/datas/export/student4.txt;
+/app/hive/datas/export/student3.txt;
+```
 
 
 
-### 5.2.4 Export导出到HDFS上
+### HiveShell命令导出
 
-(defahiveult)> export table default.student to
+```shell
+# hive -f/-e 执行语句或者脚本 > file
+bin/hive -e 'select * from default.student;' >/app/hive/datas/export/student4.txt;
+```
 
- '/user/hive/warehouse/export/student';
 
-### 5.2.5 Sqoop导出
 
-后续课程专门讲.
+### Export导出到HDFS
 
-## 5.3 清除表中数据（Truncate）
+```mysql
+hive(default)>export table default.student to '/user/hive/warehouse/export/student'
+```
 
-注意:Truncate只能删除管理表,不能删除外部表中数据
 
-hive (default)> truncate table student;
 
-# 第6章 查询
+### Sqoop导出
 
-https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Select
 
-查询语句语法:
 
-​    [WITH CommonTableExpression (,  CommonTableExpression)*]  (Note: Only available   starting  with Hive 0.13.0)  SELECT [ALL | DISTINCT] select_expr, select_expr,  ...   FROM table_reference   [WHERE where_condition]   [GROUP BY col_list]   [ORDER BY col_list]   [CLUSTER BY col_list    | [DISTRIBUTE BY col_list]  [SORT BY col_list]   ]   [LIMIT number]    
+## Truncate
 
-## 6.1 基本查询（Select…From）
+* 清除表中数据,Truncate只能删除管理表,不能删除外部表中数据
+* hive (default)> truncate table student;
 
-### 6.1.1 全表和特定列查询
 
-1．全表查询
 
-hive (default)> select * from emp;
+# 查询
 
-2．选择特定列查询
+* 官方[文档](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+Select)
 
-hive (default)> select empno, ename from emp;
+```mysql
+[WITH CommonTableExpression (,CommonTableExpression)*](Note: Only available   starting  with Hive 0.13.0)
+SELECT [ALL | DISTINCT] select_expr, select_expr,  ...
+FROM table_reference
+[WHERE where_condition]
+[GROUP BY col_list]
+[ORDER BY col_list]
+[CLUSTER BY col_list|[DISTRIBUTE BY col_list][SORT BY col_list]][LIMIT number]
+```
 
-注意:
+​      
 
-（1）SQL 语言大小写不敏感. 
+## 基本查询
 
-（2）SQL 可以写在一行或者多行
+### 简单查询
 
-（3）关键字不能被缩写也不能分行
+* 单列,多列,全表查询和MySQL语法一样,可以使用列别名
+* 常用的count,sum,avg,max,min用法和MySQL一样
+* limit分页参数和MySQL一样
+* SQL语言大小写不敏感
+* SQL可以写在一行或者多行
+* 关键字不能被缩写也不能分行
+* 各子句一般要分行写
+* 使用缩进提高语句的可读性
 
-（4）各子句一般要分行写.
 
-（5）使用缩进提高语句的可读性.
 
-### 6.1.2 列别名
-
-1．重命名一个列
-
-2．便于计算
-
-3．紧跟列名,也可以在列名和别名之间加入关键字‘AS’ 
-
-4．案例实操
-
-查询名称和部门
-
-hive (default)> select ename AS name, deptno dn from emp;
-
-### 6.1.3 算术运算符
-
-表6-3
+### 算术运算符
 
 | 运算符 | 描述           |
 | ------ | -------------- |
-| A+B    | A和B  相加     |
+| A+B    | A和B相加       |
 | A-B    | A减去B         |
-| A*B    | A和B  相乘     |
+| A*B    | A和B相乘       |
 | A/B    | A除以B         |
 | A%B    | A对B取余       |
 | A&B    | A和B按位取与   |
@@ -1181,41 +1006,9 @@ hive (default)> select ename AS name, deptno dn from emp;
 | A^B    | A和B按位取异或 |
 | ~A     | A按位取反      |
 
-案例实操
 
-​     查询出所有员工的薪水后加1显示.
 
-hive (default)> select sal +1 from emp;
-
-### 6.1.4 常用函数
-
-1．求总行数（count）
-
-hive (default)> select count(*) cnt from emp;
-
-2．求工资的最大值（max）
-
-hive (default)> select max(sal) max_sal from emp;
-
-3．求工资的最小值（min）
-
-hive (default)> select min(sal) min_sal from emp;
-
-4．求工资的总和（sum）
-
-hive (default)> select sum(sal) sum_sal from emp; 
-
-5．求工资的平均值（avg）
-
-hive (default)> select avg(sal) avg_sal from emp;
-
-### 6.1.5 Limit语句
-
-典型的查询会返回多行数据.LIMIT子句用于限制返回的行数.
-
-hive (default)> select * from emp limit 5;
-
-## 6.2 Where语句
+## Where
 
 1．使用WHERE子句,将不满足条件的行过滤掉
 
