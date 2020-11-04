@@ -10,5 +10,6 @@
   	<module>paradise-study-hdfs</module>
   	<module>paradise-study-scala</module>
   	<module>paradise-study-storm</module>
+  	<module>paradise-study-hive</module>
   </modules>
 </project>

@@ -6,12 +6,8 @@ import java.util.UUID;
 
 import org.apache.storm.Config;
 import org.apache.storm.LocalCluster;
-import org.apache.storm.kafka.BrokerHosts;
-import org.apache.storm.kafka.SpoutConfig;
-import org.apache.storm.kafka.StringScheme;
-import org.apache.storm.kafka.ZkHosts;
 import org.apache.storm.kafka.spout.KafkaSpout;
-import org.apache.storm.spout.SchemeAsMultiScheme;
+import org.apache.storm.kafka.spout.KafkaSpoutConfig;
 import org.apache.storm.spout.SpoutOutputCollector;
 import org.apache.storm.task.OutputCollector;
 import org.apache.storm.task.TopologyContext;
@@ -94,14 +90,22 @@ public class WordCountKafkaTopology {
 		Config conf = new Config();
 		conf.setNumWorkers(2);
 		conf.setDebug(true);
+		// 老版本的集成storm-kafka
 		// zk集群地址,多个用逗号隔开
-		BrokerHosts hosts = new ZkHosts("192.168.1.150:2181");
+		// BrokerHosts hosts = new ZkHosts("192.168.1.150:2181");
 		// Spout配置
-		SpoutConfig spoutConfig = new SpoutConfig(hosts, "test2", "/test2", UUID.randomUUID().toString());
-		spoutConfig.scheme = new SchemeAsMultiScheme(new StringScheme());
-		KafkaSpout kafkaSpout = new KafkaSpout(spoutConfig);
-		// 通过TopologyBuilder根据Spout和Bolt构建Topology
+		// SpoutConfig spoutConfig = new SpoutConfig(hosts, "test2", "/test2",
+		// UUID.randomUUID().toString());
+		// spoutConfig.scheme = new SchemeAsMultiScheme(new StringScheme());
+		// @SuppressWarnings("deprecation")
+		// KafkaSpout kafkaSpout = new KafkaSpout(spoutConfig);
 		TopologyBuilder builder = new TopologyBuilder();
+		// 新版本的集成storm-kafka-client
+		KafkaSpout<String, String> kafkaSpout = new KafkaSpout<>(KafkaSpoutConfig.builder("192.168.1.150:9092", "test2")
+				.setProp("group.id", UUID.randomUUID().toString())
+				.setProp("key.serializer", "org.apache.kafka.common.serialization.StringSerializer")
+				.setProp("value.serializer", "org.apache.kafka.common.serialization.StringSerializer").build());
+		// 通过TopologyBuilder根据Spout和Bolt构建Topology
 		builder.setSpout("DataSourceSpout", kafkaSpout).setNumTasks(2);
 		// 获得Spout弹射的数据源,通过id->DataSourceSpout
 		builder.setBolt("SplitBolt", new SplitBolt(), 2).shuffleGrouping("DataSourceSpout").setNumTasks(2);

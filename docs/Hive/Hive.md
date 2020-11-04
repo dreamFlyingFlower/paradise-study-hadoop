@@ -1,6 +1,6 @@
 # Hive
 
-看到视频28
+看到视频91
 
 # 概述
 
@@ -598,14 +598,12 @@ CREATE [EXTERNAL] TABLE [IF NOT EXISTS] table_name
 
 
 
-## 管理表与外部表转换
+## 内,外部表互转
 
-* 查询表的类型:hive (default)> desc formatted student2;
-* 修改内部表student2为外部表:alter table student2 set tblproperties('EXTERNAL'='TRUE');
-* 查询表的类型:hive (default)> desc formatted student2;
-* 修改外部表student2为内部表:alter table student2 set tblproperties('EXTERNAL'='FALSE');
-* 查询表的类型:hive (default)> desc formatted student2;
-* ('EXTERNAL'='TRUE')和('EXTERNAL'='FALSE')为固定写法,区分大小写
+* desc formatted student2:查询表的类型,重点查看table_type是否为external
+* alter table student2 set tblproperties('EXTERNAL'='TRUE'):修改内部表student2为外部表
+* alter table student2 set tblproperties('EXTERNAL'='FALSE'):修改外部表student2为内部表
+* ('EXTERNAL'='TRUE')和('EXTERNAL'='FALSE')为固定写法,区分大小写,引号也不要变
 
 
 
@@ -628,12 +626,15 @@ CREATE [EXTERNAL] TABLE [IF NOT EXISTS] table_name
 ```
 
 * 创建分区表语法
+  * partitioned by:需要声明一个或多个特殊的字段来区别分区表,几个字段就是几级分区
+  * 所有的分区表都是一个目录,有一个相同的上级目录
+  * SQL的WHERE后可以接分区字段,如下表中的month
 
 ```mysql
-hive (default)> create table dept_partition(  deptno int, dname string, loc string  )  partitioned by (month string)  row format delimited fields terminated by '\t'; 
+hive> create table dept_partition(deptno int,dname string,loc string)  partitioned by(month string) row format delimited fields terminated by '\t';
 ```
 
-* 加载数据到分区表中
+* 加载数据到分区表中:需要指定分区字段的值
 
 ```mysql
 hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept_partition partition(month='201709');
@@ -650,7 +651,6 @@ hive (default)> select * from dept_partition where month='201709';
 hive (default)> select * from dept_partition where month='201709'
 union select * from dept_partition where month='201708'
 union select * from dept_partition where month='201707';
-
 # _u3.deptno   _u3.dname    _u3.loc _u3.month
 # 10   ACCOUNTING   NEW YORK    201707
 # 10   ACCOUNTING   NEW YORK    201708
@@ -689,27 +689,25 @@ hive (default)> alter table dept_partition drop partition (month='201705'), part
 
  
 
-### 注意事项
+### 二级分区
 
 * 创建二级分区表
 
 ```mysql
-hive (default)> create table dept_partition2(deptno int, dname string, loc string) partitioned by (month string, day string) row format delimited fields terminated by '\t';  
+hive>create table dept_partition2(deptno int,dname string,loc string) partitioned by(month string,day string) row format delimited fields terminated by '\t';  
 ```
 
-* 正常的加载数据
+* 加载数据到二级分区表中:需要同时指定所有分区字段的值
 
-  * 加载数据到二级分区表中
+```mysql
+hive>load data local inpath '/opt/module/datas/dept.txt' into table default.dept_partition2 partition(month='201709',day='13');
+```
 
-  ```mysql
-  hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table default.dept_partition2 partition(month='201709', day='13');
-  ```
+* 查询分区数据
 
-  * 查询分区数据
-
-  ```mysql
-  hive (default)> select * from dept_partition2 where month='201709' and day='13';
-  ```
+```mysql
+hive> select * from dept_partition2 where month='201709' and day='13';
+```
 
 * 把数据直接上传到分区目录上,让分区表和数据产生关联的三种方式
 
@@ -717,56 +715,58 @@ hive (default)> create table dept_partition2(deptno int, dname string, loc strin
 
   ```mysql
   # 上传数据
-  hive (default)> dfs -mkdir -p
-   /user/hive/warehouse/dept_partition2/month=201709/day=12;
-  hive (default)> dfs -put /opt/module/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=12;
-  # 查询数据（查询不到刚上传的数据）
-  hive (default)> select * from dept_partition2 where month='201709' and day='12';
+  hive>dfs -mkdir -p /user/hive/warehouse/dept_partition2/month=201709/day=12;
+  hive>dfs -put /app/hive/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=12;
+  # 查询数据(查询不到刚上传的数据)
+  hive>select * from dept_partition2 where month='201709' and day='12';
   # 执行修复命令
-  hive> msck repair table dept_partition2;
+  hive>msck repair table dept_partition2;
   # 再次查询数据
-  hive (default)> select * from dept_partition2 where month='201709' and day='12';
+  hive>select * from dept_partition2 where month='201709' and day='12';
   ```
-
-  * 方式二:上传数据后添加分区
-
-  ```mysql
+  
+* 方式二:上传数据后添加分区
+  
+```mysql
   # 上传数据
-  hive (default)> dfs -mkdir -p
+  hive>dfs -mkdir -p
    /user/hive/warehouse/dept_partition2/month=201709/day=11;
-  hive (default)> dfs -put /opt/module/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=11;
+  hive>dfs -put /opt/module/datas/dept.txt /user/hive/warehouse/dept_partition2/month=201709/day=11;
   # 执行添加分区
-   hive (default)> alter table dept_partition2 add partition(month='201709',
-   day='11');
+  hive>alter table dept_partition2 add partition(month='201709',day='11');
   # 查询数据
-  hive (default)> select * from dept_partition2 where month='201709' and day='11';
+  hive>select * from dept_partition2 where month='201709' and day='11';
   ```
-
+  
   * 方式三:创建文件夹后load数据到分区
 
   ```mysql
-  # 创建目录
-  hive (default)> dfs -mkdir -p
+# 创建目录
+  hive>dfs -mkdir -p
    /user/hive/warehouse/dept_partition2/month=201709/day=10;
   # 上传数据
-  hive (default)> load data local inpath '/opt/module/datas/dept.txt' into table dept_partition2 partition(month='201709',day='10');
+  hive>load data local inpath '/opt/module/datas/dept.txt' into table dept_partition2 partition(month='201709',day='10');
   # 查询数据
-  hive (default)> select * from dept_partition2 where month='201709' and day='10';
+  hive>select * from dept_partition2 where month='201709' and day='10';
   ```
 
 
 
 ## 修改表
 
+
+
 ### 重命名表
 
 * ALTER TABLE table_name RENAME TO new_table_name
+
+
 
 ### 增加/修改/替换列信息
 
 * 更新列:ALTER TABLE table_name CHANGE [COLUMN] col_old_name col_new_name column_type [COMMENT col_comment] [FIRST|AFTER column_name]
 * 增加和替换列:ALTER TABLE table_name ADD|REPLACE COLUMNS (col_name data_type [COMMENT col_comment], ...) 
-* ADD表示新增一字段,字段位置在所有列后面(partition列前),REPLACE则是表示替换表中所有字段
+* ADD表示新增字段,字段位置在所有列后面(partition列前),REPLACE则是表示替换表中所有字段
 
 ```mysql
 # 查询表结构
@@ -780,8 +780,7 @@ hive (default)> alter table dept_partition change column deptdesc desc int;
 # 查询表结构
 hive> desc dept_partition;
 # 替换列
-hive (default)> alter table dept_partition replace columns(deptno string, dname
- string, loc string);
+hive (default)> alter table dept_partition replace columns(deptno string, dname string,loc string);
 # 查询表结构
 hive> desc dept_partition;
 ```
@@ -981,8 +980,6 @@ FROM table_reference
 
 
 
-### 基本语法
-
 * 所有基本的语法和通用SQL语法相同,分页,排序和MySQL相同
 * 函数count,sum,avg,max,min,group by,having和通用SQL语法相同
 * 比较运算符,like,in等和通用SQL语法相同
@@ -997,7 +994,7 @@ FROM table_reference
 
 
 
-### Sort By
+## Sort By
 
 * Sort By:每个Reducer内部进行排序,对全局结果集来说不是排序
 
@@ -1014,7 +1011,7 @@ hive (default)> insert overwrite local directory '/opt/module/datas/sortby-resul
 
 ​    
 
-### Distribute By
+## Distribute By
 
 * 分区排序:类似MR中partition,进行分区,结合sort by使用
 * Hive要求DISTRIBUTE BY语句要写在SORT BY语句之前
@@ -1027,7 +1024,7 @@ hive (default)> insert overwrite local directory '/opt/module/datas/distribute-r
 
 
 
-### Cluster By
+## Cluster By
 
 * 当distribute by和sorts by字段相同时,可以使用cluster by方式
 * cluster by除了具有distribute by的功能外还兼具sort by的功能.但是排序只能是升序排序,不能指定排序规则为ASC或者DESC
@@ -1046,33 +1043,34 @@ hive (default)> select * from emp distribute by deptno sort by deptno;
 * 分区针对的是数据的存储路径;分桶针对的是数据文件
 * 分区提供一个隔离数据和优化查询的便利方式.不过,并非所有的数据集都可形成合理的分区,特别是之前所提到过的要确定合适的划分大小这个疑虑
 * 分桶是将数据集分解成更容易管理的若干部分的另一个技术
-* 先创建分桶表,通过直接导入数据文件的方式,数据准备:student.txt
+* 先创建分桶表,直接导入数据文件添加数据,数据准备:student.txt
+  * CLUSTERED BY column INTO num BUCKETS:根据表中的某个字段分桶,分到num个桶里
 
 ```mysql
 # 创建分桶表
-create table stu_buck(id int, name string)  clustered by(id) into 4 buckets  row format delimited fields terminated by '\t';
+create table stu_buck(id int, name string) clustered by(id) into 4 buckets  row format delimited fields terminated by '\t';
 # 查看表结构
-hive (default)> desc formatted stu_buck;
+hive> desc formatted stu_buck;
 # Num Buckets:      4
 # 导入数据到分桶表中
-hive (default)> load data local inpath '/opt/module/datas/student.txt' into table stu_buck;
+hive>load data local inpath '/opt/module/datas/student.txt' into table stu_buck;
 ```
 
 * 查看创建的分桶表中是否分成4个桶,发现并没有分成4个桶
 
 ![](HiveBuck01.png)
 
-* 创建分桶表时,数据通过子查询的方式导入
+* 创建分桶表时,数据通过子查询的方式导入数据
 
 ```mysql
 # 先建一个普通的stu表
 create table stu(id int,name string) row format delimited fields terminated by '\t';
 # 向普通的stu表中导入数据
-load  data local inpath '/opt/module/datas/student.txt' into table stu;  
+load  data local inpath '/opt/module/datas/student.txt' into table stu;
 # 清空stu_buck表中数据
-truncate  table stu_buck;  select  * from stu_buck;  
+truncate  table stu_buck;
 # 导入数据到分桶表,通过子查询的方式
-insert  into table stu_buck  select  id, name from stu;  
+insert  into table stu_buck  select  id, name from stu;
 # 发现还是只有一个分桶
 ```
 
@@ -1084,7 +1082,7 @@ hive(default)> set mapreduce.job.reduces=-1;
 hive(default)> insert into table stu_buck  select  id, name from stu;
 ```
 
- ![](HiveBuck02.png)
+![](HiveBuck02.png)
 
 * 查询分桶的数据
 
@@ -1117,7 +1115,7 @@ hive(default)>select * from stu_buck;
 * 查询表stu_buck中的数据
 
 ```mysql
-hive  (default)> select * from stu_buck tablesample(bucket 1 out of 4 on id);
+hive>select * from stu_buck tablesample(bucket 1 out of 4 on id);
 ```
 
 * tablesample是抽样语句,语法:TABLESAMPLE(BUCKET x OUT OF y) 
@@ -1206,7 +1204,7 @@ select movie,category_name from movie_info lateral view explode(category) table_
 
 ## 窗口函数
 
-* OVER():指定分析函数工作的数据窗口大小,这个数据窗口大小可能会随着行的变而变化
+* OVER():指定分析函数工作的数据窗口大小,这个数据窗口大小可能会随着行的变化而变化
 * CURRENT ROW:当前行
 * n PRECEDING:往前n行数据
 * n FOLLOWING:往后n行数据
@@ -1233,7 +1231,7 @@ select movie,category_name from movie_info lateral view explode(category) table_
 # neil,2017-06-12,80
 # mart,2017-04-13,94
 # 1.查询在2017年4月份购买过的顾客及总人数
-select name,count(*) over()   from business   where substring(orderdate,1,7) = '2017-04'   group by name;
+select name,count(*) over() from business where substring(orderdate,1,7) = '2017-04' group by name;
 # 2.查询顾客的购买明细及月购买总额
 select name,orderdate,cost,sum(cost) over(partition  by month(orderdate)) from   business;
 # 3.上述的场景,要将cost按照日期进行累加
@@ -1259,19 +1257,19 @@ select * from (select name,orderdate,cost, ntile(5) over(order by orderdate) sor
 * ROW_NUMBER():会根据顺序计算
 
 ```mysql
- name    subject  score 
- 孙悟空  语文     87
- 孙悟空  数学     95
- 孙悟空  英语     68
- 大海    语文     94
- 大海    数学     56
- 大海    英语     84
- 宋宋    语文     64
- 宋宋    数学     86
- 宋宋    英语     84
- 婷婷    语文     65
- 婷婷    数学     85
- 婷婷    英语     78
+# name    subject  score 
+# 孙悟空  语文     87
+# 孙悟空  数学     95
+# 孙悟空  英语     68
+# 大海    语文     94
+# 大海    数学     56
+# 大海    英语     84
+# 宋宋    语文     64
+# 宋宋    数学     86
+# 宋宋    英语     84
+# 婷婷    语文     65
+# 婷婷    数学     85
+# 婷婷    英语     78
 # 计算每门学科成绩排名
 select name,subject,score,rank() over(partition by subject order by score  desc) rp,dense_rank() over(partition by subject order by  score desc) drp,  row_number() over(partition by subject order by  score desc) rmp from score;
 # 结果
@@ -1688,13 +1686,14 @@ insert overwrite table jointable select b.id,b.keyword,b.url_rank,b.time,b.uid, 
 * 创建分区表
 
 ```mysql
-create table ori_partitioned(id bigint, time  bigint, uid string, keyword string,   url_rank  int, click_num int, click_url string)   partitioned by (p_time bigint)   row format delimited fields terminated by '\t';  
+create table ori_partitioned(id bigint,time bigint,uid string,keyword string,url_rank  int,click_num int,click_url string) partitioned by (p_time bigint) row format delimited fields terminated by '\t';  
 ```
 
 * 加载数据到分区表中
 
 ```mysql
-hive (default)> load data local inpath '/home/atguigu/ds1'  into table   ori_partitioned  partition(p_time='20111230000010') ;  hive (default)> load data local inpath '/home/atguigu/ds2'  into table ori_partitioned partition(p_time='20111230000011') ;  
+hive>load data local inpath '/home/atguigu/ds1' into table ori_partitioned  partition(p_time='20111230000010');
+hive (default)> load data local inpath '/home/atguigu/ds2' into table ori_partitioned partition(p_time='20111230000011') ;  
 ```
 
 * 创建目标分区表
@@ -1760,8 +1759,8 @@ hive (default)> show partitions ori_partitioned_target;
 
 ### 复杂文件增加Map数
 
-* 当input的文件都很大,任务逻辑复杂,map执行非常慢的时候,可以考虑增加Map数,来使得每个map处理的数据量减少,从而提高任务的执行效率.
-* 增加map的方法为:根据computeSliteSize(Math.max(minSize,Math.min(maxSize,blocksize)))=blocksize=128M公式,调整maxSize最大值.让maxSize最大值低于blocksize就可以增加map的个数
+* 当input的文件都很大,任务逻辑复杂,map执行非常慢的时候,可以考虑增加Map数,来使得每个map处理的数据量减少,从而提高任务的执行效率
+* 增加map的方法为:根据computeSliteSize(Math.max(minSize,Math.min(maxSize,blocksize)))=blocksize=128M公式,调整maxSize最大值,让maxSize最大值低于blocksize就可以增加map的个数
 * set mapreduce.input.fileinputformat.split.maxsize=100:设置最大切片值为100个字节
 
 
@@ -1855,7 +1854,7 @@ hive (default)> show partitions ori_partitioned_target;
 
 
 
-# 常见错误及解决方案
+# 常见错误
 
 * hive默认的输入格式处理是CombineHiveInputFormat,会对小文件进行合并,可以采用HiveInputFormat就会根据分区数输出相应的文件
 
@@ -1902,7 +1901,7 @@ hive>set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 
 
 
-# Hive实战之谷粒影音
+# 实战之谷粒影音
 
 
 
@@ -2250,8 +2249,3 @@ select category_name as category,count(t2.videoId) as hot_with_views from (   se
   ```mysql
   select t1.* from (select videoId,categoryId,views,row_number() over(partition by  categoryId order by views desc) rank from gulivideo_category) t1 where rank <= 10;
   ```
-
-
-
-
-

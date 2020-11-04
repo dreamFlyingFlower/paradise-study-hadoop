@@ -83,6 +83,16 @@
 			<artifactId>storm-kafka-client</artifactId>
 			<version>${storm.version}</version>
 			<scope>${provided.scope}</scope>
+			<exclusions>
+				<exclusion>
+					<groupId>org.apache.kafka</groupId>
+					<artifactId>kafka-clients</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-clients</artifactId>
 		</dependency>
 		<!-- 解决hbase找不到jdk.tools的问题 -->
 		<dependency>
