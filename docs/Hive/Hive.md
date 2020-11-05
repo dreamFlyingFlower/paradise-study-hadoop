@@ -995,6 +995,8 @@ hive(default)>export table default.student to '/user/hive/warehouse/export/stude
 
 ### Sqoop导出
 
+见Sqoop.md
+
 
 
 ## Truncate
