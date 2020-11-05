@@ -98,35 +98,48 @@
 
 * 将MySQL目录下的mysq-connector-java.jar复制到/app/hive/lib中
 
-* 配置MySQL的地址,在hive-site.xml中
+* 配置MySQL以及其他配置,在hive-site.xml中
 
   ```xml
   <configuration>
-  <property>
-  	<name>java.jdo.option.ConnnectionURL</name>
-  	<value>jdbc:mysql://localhost:3306/hive?createDatabaseIfNotExists=true</value>
-  </property>
-  <property>
-  	<name>java.jdo.option.ConnnectionDriverName</name>
-  	<value>com.mysql.jdbc.Driver</value>
-  </property>
-  <property>
-  	<name>java.jdo.option.ConnnectionUserName</name>
-  	<value>http://192.168.1.146:50090</value>
-  </property>
-  <property>
-  	<name>java.jdo.option.ConnnectionPassword</name>
-  	<value>123456</value>
-  </property>
+      <property>
+          <name>java.jdo.option.ConnnectionURL</name>
+          <value>jdbc:mysql://localhost:3306/hive?createDatabaseIfNotExists=true</value>
+      </property>
+      <property>
+          <name>java.jdo.option.ConnnectionDriverName</name>
+          <value>com.mysql.jdbc.Driver</value>
+      </property>
+      <property>
+          <name>java.jdo.option.ConnnectionUserName</name>
+          <value>http://192.168.1.146:50090</value>
+      </property>
+      <property>
+          <name>java.jdo.option.ConnnectionPassword</name>
+          <value>123456</value>
+      </property>
+      <!-- 很多直接利用系统变量的配置需要改掉,在整个配置文件中搜system -->
+      <!-- hive运行时文件的存储地址 -->
+      <property>
+          <name>hive.exec.local.scratchdir</name>
+          <value>/app/hive</value>
+      </property>
+      <property>
+          <name>hive.downloaded.resources.dir</name>
+          <value>/app/hive/downloads</value>
+      </property>
+      <property>
+          <name>hive.querylog.location</name>
+          <value>/app/hive/querylog</value>
+      </property>
+      <!-- 其他不一一列举 -->
   </configuration>
   ```
 
-* 启动hive:
+* 将Hive的元数据初始化到MySQL中:schematool -dbType mysql -initSchema
 
-  ```shell
-  bin/hive
-  ```
-  
+* 启动hive:bin/hive
+
   
 
 # 配置
@@ -242,6 +255,10 @@ hive (default)> get mapred.reduce.tasks;
 * dfs -ls /:在Hive中查看HDFS
 * ! ls /root:在Hive中查看Linux的文件系统
 * 查看hive的历史命令:进入当前用户根目录下,cat .hivehistory
+* bin/hive:直接进入hive的控制台,使用SQL对数据库进行操作,该模式下无法远程连接数据库
+* bin/hiveserver2:后台启动该脚本,可以让其他远程地址连接数据库,默认端口是10000
+* bin/beeline:利用hiveserver2启动hive后,运行该脚本可连接数据库,需要输入仓库地址等
+  * !connect jdbc:hive2://localhost:10000/mydb2:连接到hive数据
 
 
 
@@ -363,6 +380,33 @@ hive (default)>select friends[1],children['xiao song'],address.city from test wh
 
 
 # DDL数据定义
+
+
+
+## 事务
+
+* 在0.13.0之后的版本中支持事务
+* 所有事务自动提交
+* 只支持orc格式
+* 使用bucket表
+* 需要进行配置
+  * hive.support.concurrency = true;
+  * hive.enforce.bucketing = true;
+  * hive.exec.dynamic.partition.mode = nonstrict;
+  * SET hive.txn.manager = org.apache.hadoop.hive.ql.lockmgr.DbTxnManager;
+  * SET hive.compactor.initiator.on = true;
+  * SET hive.compactor.worker.threads = 1;
+* 使用事务操作
+
+```mysql
+CREATE TABLE tx(id int,name string,age int) CLUSTERED BY (id) INTO 3 BUCKETS ROW FORMAT DELIMITED FIELDS TERMINATED BY ',' stored as orc TBLPROPERTIES ('transactional'='true');
+```
+
+
+
+## 视图
+
+* 支持视图,语法同通用SQL
 
 
 
@@ -736,8 +780,8 @@ hive> select * from dept_partition2 where month='201709' and day='13';
   hive>alter table dept_partition2 add partition(month='201709',day='11');
   # 查询数据
   hive>select * from dept_partition2 where month='201709' and day='11';
-  ```
-  
+```
+
   * 方式三:创建文件夹后load数据到分区
 
   ```mysql
@@ -1307,9 +1351,9 @@ select name,subject,score,rank() over(partition by subject order by score  desc)
 * UDAF:User-Defined Aggregation Function:聚集函数,多进一出,类似于:count/max/min
 * UDTF:User-Defined Table-Generating Functions:一进多出,如lateral view explore()
 * 利用Java开发UDF,步骤如下:
-  * 继承org.apache.hadoop.hive.ql.UDF
-  * 需要重写evaluate方法,evaluate方法支持重载
-  * 在hive命令行添加打包好的jar:add jar udf_jar_path
+  * 继承org.apache.hadoop.hive.ql.UDF或者继承org.apache.hadoop.hive.ql.udf.generic.GenericUDF,建议继承GenericUDF
+  * 需要自己重写evaluate方法,evaluate方法支持重载
+  * 在hive命令行添加打包好的jar到hive环境中:add jar udf_jar_path
   * 创建function:create [temporary] function [dbname.]function_name AS class_name;
   * 删除函数:Drop [temporary] function [if exists] [dbname.]function_name;
 * UDF必须要有返回类型,可以返回null,但是返回类型不能为void
@@ -1795,11 +1839,11 @@ hive (default)> show partitions ori_partitioned_target;
 ## 严格模式
 
 * Hive提供了一个严格模式,可以防止用户执行那些可能意想不到的不好的影响的查询
-* 通过设置属性hive.mapred.mode值为默认是非严格模式nonstrict
-* 开启严格模式需要修改hive.mapred.mode值为strict,开启严格模式可以禁止3种类型的查询
-  * 对于分区表,除非where语句中含有分区字段过滤条件来限制范围,否则不允许执行.换句话说,就是用户不允许扫描所有分区.进行这个限制的原因是,通常分区表都拥有非常大的数据集,而且数据增加迅速.没有进行分区限制的查询可能会消耗令人不可接受的巨大资源来处理这个表
-  * 对于使用了order by语句的查询,要求必须使用limit语句.因为order by为了执行排序过程会将所有的结果数据分发到同一个Reducer中进行处理,强制要求用户增加这个LIMIT语句可以防止Reducer额外执行很长一段时间
-  * 限制笛卡尔积的查询.对关系型数据库非常了解的用户可能期望在执行JOIN查询的时候不使用ON语句而是使用where语句,这样关系数据库的执行优化器就可以高效地将WHERE语句转化成那个ON语句.不幸的是,Hive并不会执行这种优化,因此,如果表足够大,那么这个查询就会出现不可控的情况
+* hive.mapred.mode=strict:设置为严格模式,默认是非严格模式nonstrict
+* 开启严格模式可以禁止3种类型的查询
+  * 对于分区表,除非where语句中含有分区字段过滤条件来限制范围,否则不允许执行
+  * 对于使用了order by语句的查询,要求必须使用limit语句
+  * 限制笛卡尔积的查询
 
 
 
@@ -1955,140 +1999,7 @@ hive>set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 
 * 通过观察原始数据形式,可以发现,视频可以有多个所属分类,每个所属分类用&符号分割,且分割的两边有空格字符,同时相关视频也是可以有多个元素,多个相关视频又用“\t”进行分割
 * 为了分析数据时方便对存在多个子元素的数据进行操作,首先进行数据重组清洗操作.即:将所有的类别用“&”分割,同时去掉两边空格,多个相关视频id也使用“&”进行分割
-* ETL之ETLUtil
-
-```java
-public class ETLUtil {
-    public static String  oriString2ETLString(String ori){
-        StringBuilder etlString = new  StringBuilder();
-        String[] splits =  ori.split("\t");
-        if(splits.length < 9) return null;
-        splits[3] = splits[3].replace("  ", "");
-        for(int i = 0; i < splits.length;  i++){
-            if(i < 9){
-                if(i == splits.length - 1){
-                    etlString.append(splits[i]);
-                }else{
-                    etlString.append(splits[i]  + "\t");
-                }
-            }else{
-                if(i == splits.length - 1){
-                    etlString.append(splits[i]);
-                }else{
-                    etlString.append(splits[i]  + "&");
-                }
-            }
-        }
-        return etlString.toString();
-    }
-}
-```
-
-* ETL之Mapper
-
-```java
-import java.io.IOException;
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.Mapper;
-import com.atguigu.util.ETLUtil;
-public class  VideoETLMapper extends Mapper<Object, Text, NullWritable, Text>{
-    Text text = new Text();
-    @Override
-    protected void map(Object key, Text value,  Context context) throws IOException, InterruptedException {
-        String etlString = ETLUtil.oriString2ETLString(value.toString());
-        if(StringUtils.isBlank(etlString))  return;
-        text.set(etlString);
-        context.write(NullWritable.get(),  text);
-    }
-}
-```
-
-* ETL之Runner
-
-```java
-import java.io.IOException;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.NullWritable;
-import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.util.Tool;
-import org.apache.hadoop.util.ToolRunner;
-
-public class VideoETLRunner implements Tool {
-
-	private Configuration conf = null;
-
-	@Override
-	public void setConf(Configuration conf) {
-		this.conf = conf;
-	}
-
-	@Override
-	public Configuration getConf() {
-		return this.conf;
-	}
-
-	@Override
-	public int run(String[] args) throws Exception {
-		conf = this.getConf();
-		conf.set("inpath", args[0]);
-		conf.set("outpath", args[1]);
-		Job job = Job.getInstance(conf);
-		job.setJarByClass(VideoETLRunner.class);
-		job.setMapperClass(VideoETLMapper.class);
-		job.setMapOutputKeyClass(NullWritable.class);
-		job.setMapOutputValueClass(Text.class);
-		job.setNumReduceTasks(0);
-		this.initJobInputPath(job);
-		this.initJobOutputPath(job);
-		return job.waitForCompletion(true) ? 0 : 1;
-	}
-
-	private void initJobOutputPath(Job job) throws IOException {
-		Configuration conf = job.getConfiguration();
-		String outPathString = conf.get("outpath");
-		FileSystem fs = FileSystem.get(conf);
-		Path outPath = new Path(outPathString);
-		if (fs.exists(outPath)) {
-			fs.delete(outPath, true);
-		}
-		FileOutputFormat.setOutputPath(job, outPath);
-	}
-
-	private void initJobInputPath(Job job) throws IOException {
-		Configuration conf = job.getConfiguration();
-		String inPathString = conf.get("inpath");
-		FileSystem fs = FileSystem.get(conf);
-		Path inPath = new Path(inPathString);
-		if (fs.exists(inPath)) {
-			FileInputFormat.addInputPath(job, inPath);
-		} else {
-			throw new RuntimeException("HDFS中该文件目录不存在:" + inPathString);
-		}
-	}
-
-	public static void main(String[] args) {
-		try {
-			int resultCode = ToolRunner.run(new VideoETLRunner(), args);
-			if (resultCode == 0) {
-				System.out.println("Success!");
-			} else {
-				System.out.println("Fail!");
-			}
-			System.exit(resultCode);
-		} catch (Exception e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
-	}
-}
-```
+* 代码见paradise-study-hive/src/main/com/wy/video
 
 * 执行ETL
 

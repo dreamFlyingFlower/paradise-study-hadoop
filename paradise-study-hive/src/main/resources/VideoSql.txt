@@ -1,0 +1,318 @@
+create table gulivideo_ori(
+    videoId string, 
+    uploader string, 
+    age int, 
+    category array<string>, 
+    length int, 
+    views int, 
+    rate float, 
+    ratings int, 
+    comments int,
+    relatedId array<string>)
+row format delimited 
+fields terminated by "\t"
+collection items terminated by "&"
+stored as textfile;
+
+1.统计视频观看数Top10
+SELECT
+    videoId,views
+FROM
+    gulivideo_orc
+ORDER BY
+    views DESC
+LIMIT 10;
+
+2.统计视频类别热度Top10
+a.炸开类别
+SELECT videoId,category_name
+FROM gulivideo_orc
+lateral view explode(category) category_t as category_name; t1
+b.统计每种类别下的视频数
+SELECT category_name,count(*) hot
+from t1
+group by category_name;
+c.类别热度Top10
+SELECT category_name,hot
+from t2
+order by hot desc
+limit 10
+
+SELECT
+    category_name,
+    hot
+FROM
+    (
+        SELECT
+            category_name,
+            count(*) hot
+        FROM
+            (
+                SELECT
+                    videoId,
+                    category_name
+                FROM
+                    gulivideo_orc lateral VIEW explode (category) category_t AS category_name
+            ) t1
+        GROUP BY
+            category_name
+    ) t2
+ORDER BY
+    hot DESC
+LIMIT 10;
++----------------+---------+--+
+| category_name  |   hot   |
++----------------+---------+--+
+| Music          | 179049  |
+| Entertainment  | 127674  |
+| Comedy         | 87818   |
+| Animation      | 73293   |
+| Film           | 73293   |
+| Sports         | 67329   |
+| Gadgets        | 59817   |
+| Games          | 59817   |
+| Blogs          | 48890   |
+| People         | 48890   |
++----------------+---------+--+
+
+3.统计视频观看数Top20所属类别
+a.统计观看数前20的视频
+SELECT
+    videoId,views,category
+FROM
+    gulivideo_orc
+ORDER BY
+    views DESC
+LIMIT 20;t1
+
+b.前20视频的类别
+SELECT
+    distinct(category_name)
+FROM
+    (
+        SELECT
+            videoId,
+            views,
+            category
+        FROM
+            gulivideo_orc
+        ORDER BY
+            views DESC
+        LIMIT 20
+    ) t1 lateral VIEW explode (category) category_t AS category_name;
+t2
+
+SELECT DISTINCT(category_name)
+from t2
+
+
+ 统计出视频观看数最高的20个视频的所属类别以及类别包含Top20视频的个数
+a.统计观看数前20的视频
+SELECT
+    videoId,views,category
+FROM
+    gulivideo_orc
+ORDER BY
+    views DESC
+LIMIT 20;t1
+b.前20视频的类别
+SELECT videoId,category_name
+from (SELECT
+    videoId,views,category
+FROM
+    gulivideo_orc
+ORDER BY
+    views DESC
+LIMIT 20) t1
+lateral view explode(category) category_t as category_name;
+
+4.统计视频观看数Top50所关联视频的所属类别Rank
+a.统计观看数前50的视频&关联视频
+SELECT
+    videoId,views,category,relatedId
+FROM
+    gulivideo_orc
+ORDER BY
+    views DESC
+LIMIT 50;t1
+
+b.炸开关联视频id
+SELECT distinct(relatedId_name)
+from t1
+lateral view explode(relatedId) relatedId_t as relatedId_name;t2
+
+c.关联视频所属类别
+SELECT *
+from t2 join
+gulivideo_orc t3
+on t2.relatedId_name=t3.videoId;t4
+
+d.炸开关联视频的类别
+SELECT * from t4
+lateral view explode(category) category_t as category_name;t5
+
+e.统计类别个数
+SELECT category_name,count(*) hot
+from t5
+group by category_name;t6
+
+f.统计类别rank
+SELECT * from t6 order by hot desc;
+
+
+SELECT * from (SELECT category_name,count(*) hot
+from (SELECT * from (SELECT *
+from (SELECT distinct(relatedId_name)
+from (SELECT
+    videoId,views,category,relatedId
+FROM
+    gulivideo_orc
+ORDER BY
+    views DESC
+LIMIT 50)t1
+lateral view explode(relatedId) relatedId_t as relatedId_name)t2 join
+gulivideo_orc t3
+on t2.relatedId_name=t3.videoId)t4
+lateral view explode(category) category_t as category_name)t5
+group by category_name)t6 order by hot desc;
++-------------------+---------+--+
+| t6.category_name  | t6.hot  |
++-------------------+---------+--+
+| Comedy            | 232     |
+| Entertainment     | 216     |
+| Music             | 195     |
+| Blogs             | 51      |
+| People            | 51      |
+| Film              | 47      |
+| Animation         | 47      |
+| News              | 22      |
+| Politics          | 22      |
+| Games             | 20      |
+| Gadgets           | 20      |
+| Sports            | 19      |
+| Howto             | 14      |
+| DIY               | 14      |
+| UNA               | 13      |
+| Places            | 12      |
+| Travel            | 12      |
+| Animals           | 11      |
+| Pets              | 11      |
+| Autos             | 4       |
+| Vehicles          | 4       |
++-------------------+---------+--+
+
+
+SELECT
+    *
+FROM
+    (
+        SELECT
+            category_name,
+            count(*) hot
+        FROM
+            (
+                SELECT
+                    *
+                FROM
+                    (
+                        SELECT
+                            *
+                        FROM
+                            (
+                                SELECT DISTINCT
+                                    (relatedId_name)
+                                FROM
+                                    (
+                                        SELECT
+                                            videoId,
+                                            views,
+                                            category,
+                                            relatedId
+                                        FROM
+                                            gulivideo_orc
+                                        ORDER BY
+                                            views DESC
+                                        LIMIT 50
+                                    ) t1 lateral VIEW explode (relatedId) relatedId_t AS relatedId_name
+                            ) t2
+                        JOIN gulivideo_orc t3 ON t2.relatedId_name = t3.videoId
+                    ) t4 lateral VIEW explode (category) category_t AS category_name
+            ) t5
+        GROUP BY
+            category_name
+    ) t6
+ORDER BY
+    hot DESC;
+
+
+5.统计每个类别中的视频热度Top10
+6.统计每个类别中视频流量Top10
+7.统计上传视频最多的用户Top10以及他们上传的观看次数在前20的视频
+a.上传视频数前10的人
+SELECT * from gulivideo_user_orc order by videos desc limit 10;t1
+b.这10个人所上传的视频
+SELECT * from t1
+join gulivideo_orc t2
+on t1.uploader= t2.uploader;t3
+c.观看次数在前20的视频
+SELECT *
+from t3
+order by views
+desc
+limit 20;
+
+SELECT *
+from (SELECT * from (SELECT * from gulivideo_user_orc order by videos desc limit 10)t1
+join gulivideo_orc t2
+on t1.uploader= t2.uploader)t3
+order by views
+desc
+limit 20;
+
+SELECT
+    *
+FROM
+    (
+        SELECT
+            views,videoId,t1.uploader
+        FROM
+            (
+                SELECT
+                    uploader,videos
+                FROM
+                    gulivideo_user_orc
+                ORDER BY
+                    videos DESC
+                LIMIT 10
+            ) t1
+        JOIN gulivideo_orc t2 ON t1.uploader = t2.uploader
+    ) t3
+ORDER BY
+    views DESC
+LIMIT 100;
++-----------+--------------+----------------+--+
+| t3.views  |  t3.videoid  |  t3.uploader   |
++-----------+--------------+----------------+--+
+| 39059     | -IxHBW0YpZw  | expertvillage  |
+| 29975     | BU-fT5XI_8I  | expertvillage  |
+| 26270     | ADOcaBYbMl0  | expertvillage  |
+| 25511     | yAqsULIDJFE  | expertvillage  |
+| 25366     | vcm-t0TJXNg  | expertvillage  |
+| 24659     | 0KYGFawp14c  | expertvillage  |
+| 22593     | j4DpuPvMLF4  | expertvillage  |
+| 18822     | Msu4lZb2oeQ  | expertvillage  |
+| 16304     | ZHZVj44rpjE  | expertvillage  |
+| 13576     | foATQY3wovI  | expertvillage  |
+| 13450     | -UnQ8rcBOQs  | expertvillage  |
+| 11639     | crtNd46CDks  | expertvillage  |
+| 11553     | D1leA0JKHhE  | expertvillage  |
+| 11452     | NJu2oG1Wm98  | expertvillage  |
+| 10915     | CapbXdyv4j4  | expertvillage  |
+| 10817     | epr5erraEp4  | expertvillage  |
+| 10597     | IyQoDgaLM7U  | expertvillage  |
+| 10402     | tbZibBnusLQ  | expertvillage  |
+| 9422      | _GnCHodc7mk  | expertvillage  |
+| 7123      | hvEYlSlRitU  | expertvillage  |
++-----------+--------------+----------------+--+
+
+8.统计每个类别视频观看数Top10
