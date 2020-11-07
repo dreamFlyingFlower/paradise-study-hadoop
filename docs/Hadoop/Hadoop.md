@@ -91,7 +91,7 @@
 * 项目经理.
 * JobTracker对应于NameNode
 * JobTracker是一个master服务,软件启动之后JobTracker接收Job,负责调度Job的每一个子任务
-* task运行于TaskTracker上,并监控它们,如果发现有失败的task就重新运行它
+* Task运行于TaskTracker上,并监控它们,如果发现有失败的task就重新运行它
 
 
 
@@ -115,6 +115,8 @@
 
 
 # NameNode(NN)
+
+## 概述
 
 * 文件元数据(metadata)节点
 * 存储文件元数据,包括文件名,目录结构,属性,每个文件的block列表和block所在的datanode
@@ -436,7 +438,6 @@
 * 将文件中的内容按行读取,之后按照空格进行切分
 * 再开辟空间进行分区排序,排序按字典排序,将结果放在一个类似map的集合中
 * 排序之后再将相同的项进行合并
-
 * MrAppMaster:负责整个程序的过程调度及状态协调
 
 
@@ -710,14 +711,16 @@
 * hadoop fs [] 
 
   * -ls /file:查看上传的文件是否成功,成功会列出文件地址,否则报错文件不存在
-
+* -lsr /folder:对目录进行递归查看
+  * -mkdir /folder:创建目录
   * -moveFromLocal src des:将本地文件上传到hdfs中,同时会删除本地文件
   * -appendToFile src des:将本地文件的内容追加到hdfs中某个文件中,本地文件不变
   * -put/-copyFromLocal src des:将本地文件上传到hdfs中,本地文件不删除.若是/des存在,则删除hadoop fs -rm -r /des,提示deleted des才表示删除成功
   * -get/-copyToLocal src des:将hdfs从的文件拷贝到本地目录,hdfs中的文件不删除
   * -cp/-mv/-tail src des:类似linux的cp/mv/tail,只能在hdfs中拷贝和使用
   * -getmerge folder file:将hdfs中的多个文件合并下载到本地
-  * -cat /file:查看hadoop中某个文件的内容
+  * -cat file:查看文件内容
+  * -text file:查看文件内容
   * -rm -r /file:删除hadoop集群中的文件或目录
 * hadoop jar XXX.jar xx.xx.xxx.TestMain /input /output:运行jar包,需要指定main所在类,/input表示上传文件所在地址,/output表示文件输出地址,且该地址不能是已经存在的
 * hadoop distcp hdfs://hadoop001:9000/file1 hdfs://hadoop002:9000/file2:hadoop2.0才有该命令,可以实现直接将hdfs中的file1复制到hdfs的file2中,而且是递归复制
