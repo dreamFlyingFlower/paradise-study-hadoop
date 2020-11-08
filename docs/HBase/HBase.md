@@ -1,6 +1,6 @@
 # HBase
 
-
+看到37微博之需求分析
 
 # 概念
 
@@ -101,7 +101,7 @@
 * 2.client对regionserver发起写请求,regionserver接受数据写入内存
 * 3.当memstore的大小达到一定值后,flush到storefile并存储到hdfs
 * 4.读:client先访问zk,得到对应的regionserver地址
-* 5.client对regionserver发起请求,regionserver收到请求后,先扫描自己的memstore,没有找到,再扫描blockcache(加速读内容缓存区),每有找到,再从storefile中读,然后将数据返回给client
+* 5.client对regionserver发起请求,regionserver收到请求后,先扫描自己的memstore,没有找到,再扫描blockcache(加速读内容缓存区),没有找到,再从storefile中读,然后将数据返回给client
 
 
 
@@ -255,7 +255,7 @@
 
 
 
-# Shell操作
+# HBaseShell
 
 * create 'tablename','列名1','列名2','列名...':创建表
 * list:查看存在那些表
