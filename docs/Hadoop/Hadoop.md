@@ -88,7 +88,7 @@
 
 ## JobTracker
 
-* 项目经理.
+* 项目经理,在Hadoop2.0以上的版本中已经去掉了
 * JobTracker对应于NameNode
 * JobTracker是一个master服务,软件启动之后JobTracker接收Job,负责调度Job的每一个子任务
 * Task运行于TaskTracker上,并监控它们,如果发现有失败的task就重新运行它
@@ -97,7 +97,7 @@
 
 ## TaskTracker
 
-* 开发组长
+* 开发组长,在Hadoop2.0以上的版本中已经去掉了
 * TaskTracker对应于DataNode
 * TaskTracker是运行在多个节点上的slaver服务
 * TaskTracker主动与JobTracker通信,接收作业,并负责直接执行每一个任务
@@ -897,6 +897,14 @@
     1. mr-jobhistory-daemon.sh start|stop historyserver:启动/停止历史服务器
     2. yarn-daemon.sh start|stop resourcemanager:启动/停止总资源管理器
     3. yarn-daemon.sh start|stop nodemanager:启动/停止节点管理器
+    
+23. Web查看Hadoop数据
+
+    1. namenode:50070:查看NN信息
+    2. datanode:50075:查看DN信息
+    3. SNN:50090:查看SNN信息
+    4. yarn-rm:8088:集群信息
+    5. yarn-nm:8042:NM信息
 
 
 
@@ -1420,3 +1428,9 @@ bin/hdfs haadmin -transitionToActive nn1
 * 图片业务,爬虫业务,日志审计业务
 
 * Hadoop生态系统中,不同的框架使用不同的NameNode进行管理NameSpace(隔离性)
+
+
+
+# Ambari
+
+* Hadoop集群管理软件

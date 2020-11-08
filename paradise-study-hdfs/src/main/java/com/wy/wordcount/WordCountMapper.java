@@ -5,6 +5,7 @@ import java.util.StringTokenizer;
 
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.InputSplit;
 import org.apache.hadoop.mapreduce.Mapper;
 
 /**
@@ -15,7 +16,7 @@ import org.apache.hadoop.mapreduce.Mapper;
  *          VALUEIN:输入数据的value类型<br>
  *          KEYOUT:输出数据的key类型<br>
  *          VALUEOUT:输出数据的value类型
- * 
+ *          
  * @author ParadiseWY
  * @date 2020-10-21 15:15:50
  * @git {@link https://github.com/mygodness100}
@@ -45,5 +46,28 @@ public class WordCountMapper extends Mapper<Object, Text, Text, IntWritable> {
 
 	enum WordCount {
 		WORDCOUNT;
+	}
+
+	/**
+	 * map执行完成后清理过程,只调用一次
+	 */
+	@Override
+	protected void cleanup(Mapper<Object, Text, Text, IntWritable>.Context context)
+			throws IOException, InterruptedException {
+		super.cleanup(context);
+	}
+
+	/**
+	 * map task执行之前调用,只调用一次
+	 */
+	@Override
+	protected void setup(Mapper<Object, Text, Text, IntWritable>.Context context)
+			throws IOException, InterruptedException {
+		super.setup(context);
+		// 获得输入切割数据
+		InputSplit split = context.getInputSplit();
+		// 取得切割的长度
+		 long length = split.getLength();
+		 System.out.println(length);
 	}
 }

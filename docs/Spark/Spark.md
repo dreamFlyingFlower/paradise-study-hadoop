@@ -53,6 +53,11 @@
 
 * DataSets:
 * DataFrames:
+* RDD:ResilientDistributedDataset:弹性分布式数据集,是Spark的核心抽象.
+  * 只读的对象集合,按照集群主机进行分区
+  * 多个RDD作为input进行加载并进行一系列转变成新的RDD
+  * 弹性是指Spark可以根据计算的来源方式,通过重新计算后进行的自动重构丢失的分区
+  * 加载数据或执行变换并不会触发数据处理,只有生成执行计划,直到action执行时才处理
 
 
 
@@ -111,7 +116,7 @@
 
     
 
-# 安装运行
+# 安装
 
 详见官网[文档](http://spark.apache.org/docs/latest/#),参数[文档](http://spark.apache.org/docs/latest/submitting-applications.html)
 
@@ -125,6 +130,8 @@
   # master指定运行模式:local表示运行模式为本地,2表示多线程的线程数
   spark-shell --master local[2]
   ```
+  
+* 本地模式连接到集群时,若集群中的节点中有同名文件,本地模式加载该文件内容就会随机显示
 
 
 
@@ -145,7 +152,7 @@
 
 * 当含有work时,可以使用sbin/start-all.sh启动spark
 
-* web页面可以从启动日志中查看masterui,能够打开网址即部署成功
+* web页面可以从启动日志中查看masterui,能够打开网址即部署成功,默认端口是8080
 
 
 
@@ -158,9 +165,11 @@
 
 
 
-## HA
+# HA
 
-### 基于文件目录
+
+
+## 基于文件目录
 
 * 用于开发测试环境的单机环境
 
@@ -177,7 +186,7 @@
 
 
 
-### 基于ZooKeeper
+## 基于ZooKeeper
 
 * 用于生产环境
 
@@ -191,6 +200,8 @@
   # spark.deploy.zookeeper.url:zk集群地址
   # spark.deploy.zookeeper.dir:spark信息在zk中保存的目录
   export SPARK_DAEMON_JAVA_OPTS="-Dspark.deploy.recoveryMode=ZOOKEEPER -Dspark.deploy.zookeeper.url=master01:2181,master02:2181,master03:2181 -Dspark.deploy.zookeeper.dir=/spark"
+  # SPARK_MASTER_PORT=7077
+  # SPARK_MASTER_WEBUI_PORT=8088
   ```
 
 * 修改conf/slaves
@@ -204,9 +215,20 @@
 
 * 需要手动启动master02:sbin/start-master.sh
 
+* spark-shell --master spark://hadoop01:7077:连接到集群
 
 
-# Spark SQL
+
+# SparkShell
+
+* bin/spark-shell:进入spark的控制台,可以使用scala操作spark.scala语法见scala文档
+* sc:进入spark控制台就存在的上下文环境,可以直接使用,可以自动补全
+* sc.textFile("path"):加载linux中的文件,需要赋值给另外的变量
+* 
+
+
+
+# SparkSQL
 
 官网[文档](http://spark.apache.org/docs/latest/sql-programming-guide.html)
 
@@ -229,6 +251,8 @@
   
 
 # 用户行为日志
+
+
 
 ## 概述
 
