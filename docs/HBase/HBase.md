@@ -255,7 +255,14 @@
 
 * jps:显示HMaster,HRegionServer,HQuorumPeer
 
-* 进入到hbase的命令行:./hbase shell,进入控制台后,执行status,会显示当前hbase的状
+* 进入到hbase的命令行:./hbase shell,进入控制台后,执行status,会显示当前hbase的状态
+
+
+
+## HA
+
+* 直接在集群的某个服务器中使用master命令启动即可实现HA
+* bin/hbase-daemon.sh start master:以master的方式启动hbase
 
 
 
