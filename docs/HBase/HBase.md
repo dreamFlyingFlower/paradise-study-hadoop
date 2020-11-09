@@ -179,17 +179,15 @@
 
 * jps查看进程:HMaster,HRegionServer
 
-* 访问ip:16010
+* Web访问ip:16010
 
 
 
-## 伪分布式
+## 集群
 
 * 在单机版基础上还需要增加其他[配置](http://abloz.com/hbase/book.html#hbase_default_configurations)
 
 * 集群依赖于Hadoop,所以要先将Hadoop的集群搭建成功
-
-* 复制hadoop的hdfs-site.xml和core-site.xml到hbase的conf文件夹下
 
 * 修改hbase-env.sh
 
@@ -199,17 +197,20 @@
   # 给hbase分配的内存空间
   # export HBASE_MASTER_OPTS="$HBASE_MASTER_OPTS -XX:PermSize=128m ..."
   # export HBASE_REGIONSERVER_OPTS="$HBASE_REGIONSERVER_OPTS..."
-  # 是否使用hbase自带的zk,true表示使用
-  export HBASE_MANAGES_ZK = true
+  # 是否使用hbase自带的zk,true表示使用,false使用自己搭建的zk集群,最好使用自己搭建的集群
+  export HBASE_MANAGES_ZK = false
   ```
 
 * 修改hbase-site.xml,在configuration标签添加如下:
 
   ```xml
-  <!-- 指定hbase的根目录,基于hadoop的ip:端口,加上自定义的目录名,会在hbase启动时自动在hadoop下创建 -->
+  <!-- 指定hbase在hdfs上的根目录,集群写集群的NN地址,hbase目录在启动时自动在hdfs中创建 -->
   <property>
   	<name>hbase.rootdir</name>
-  	<value>hdfs://localhost:9000/hbase</value>
+      <!-- 伪分布式模式下可以写hdfs的地址 -->
+  	<!-- <value>hdfs://localhost:9000/hbase</value> -->
+      <!-- 集群模式下填写hadoop集群地址 -->
+      <value>hdfs://cluster/hbase</value>
   </property>
   <!-- 指定hbase是否以集群的方式运行 -->
   <property>
@@ -219,11 +220,12 @@
   <!-- 若不使用自带的zk,需配置zk地址:第1个是zk的ip,第2个是zk的端口,多个用逗号隔开 -->
   <property>
   	<name>hbase.zookeeper.quorum</name>
-  	<value>localhost</value>
+  	<value>localhost:2181</value>
   </property>
-  <property>
+  <!-- <property>
   	<name>hbase.zookeeper.property.clientPort</name>
   	<value>2181</value>
+  -->
   </property>
   <!-- 指定zookeeper的存储路径 -->
   <property>
@@ -247,11 +249,13 @@
   </property>
   ```
 
+* 将Hadoop的core-site.xml和hdfs-site.xml复制到hbase的conf目录下,或者建立软连接
+
 * 启动hbase:进入hbase/bin下,sh start-hbase.sh,会显示启动了zk,master,regionserver
 
 * jps:显示HMaster,HRegionServer,HQuorumPeer
 
-* 进入到hbase的命令行:./hbase shell,进入控制台后,执行status,会显示当前hbase的状态
+* 进入到hbase的命令行:./hbase shell,进入控制台后,执行status,会显示当前hbase的状
 
 
 
