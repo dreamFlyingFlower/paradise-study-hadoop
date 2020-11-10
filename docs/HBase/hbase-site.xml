@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<!-- 一个store里面允许存的hfile的数,超过这个数会被写到新的一个hfile里面,即每个region的每个列族对应的memstore在fulsh为hfile的时候,默认情况下当超过3个hfile的时候就会对这些文件进行合并重写为一个新文件.值越大越减少触发合并的时间,但是合并的时间就会越长 -->
+	<property>
+		<name>hbase.hstore.compactionThreshold</name>
+		<value>3</value>
+	</property>
+	<!-- 每个minor compaction操作的允许的最大hfile文件上限 -->
+	<property>
+		<name>hbase.hstore.compaction.max</name>
+		<value>10</value>
+	</property>
+	<!-- RegionServer的全局memstore的大小,超过该大小会触发flush到磁盘的操作,默认是堆大小的40%,而且RegionServerr级别的flush会阻塞客户端读写 -->
+	<property>
+		<name>hbase.regionserver.global.memstore.size</name>
+		<value></value>
+	</property>
+	<!-- 内存中的文件在自动刷新之前能够存活的最长时间,默认是1h -->
+	<property>
+		<name>hbase.regionserver.optionalcacheflushinterval</name>
+		<value>3600000</value>
+	</property>
+	<!-- 单个region里memstore的缓存大小,超过那么整个HRegion就会flush,默认128M -->
+	<property>
+		<name>hbase.hregion.memstore.flush.size</name>
+		<value>134217728</value>
+	</property>
+	<!-- hbase的本地临时目录,默认放在/tmp目录下 -->
+	<property>
+		<name>hbase.tmp.dir</name>
+		<value>${java.io.tmpdir}/hbase-${user.name}</value>
+	</property>
+	<!-- 每个regionServer的共享目录,用来持久化Hbase,默认情况下在/tmp/hbase下面 -->
+	<property>
+		<name>hbase.rootdir</name>
+		<value>${hbase.tmp.dir}/hbase</value>
+	</property>
+	<!-- hbase底层如果使用hdfs作为文件系统,这里是指默认在文件系统的临时存储目录用来存储临时数据 -->
+	<property>
+		<name>hbase.fs.tmp.dir</name>
+		<value>/user/${user.name}/hbase-staging</value>
+	</property>
+	<!-- hdfs里面批量装载的目录 -->
+	<property>
+		<name>hbase.bulkload.staging.dir</name>
+		<value>${hbase.fs.tmp.dir}</value>
+	</property>
+	<!-- hbase集群模式,false表示hbase的单机,true表示是分布式模式 -->
+	<property>
+		<name>hbase.cluster.distributed</name>
+		<value>false</value>
+	</property>
+	<!-- hbase依赖的zk地址 -->
+	<property>
+		<name>hbase.zookeeper.quorum</name>
+		<value>localhost</value>
+	</property>
+	<!-- 如果是本地存储,位于本地文件系统的路径 -->
+	<property>
+		<name>hbase.local.dir</name>
+		<value>${hbase.tmp.dir}/local/</value>
+	</property>
+
+	<!-- hbase master节点的端口 -->
+	<property>
+		<name>hbase.master.port</name>
+		<value>16000</value>
+	</property>
+	<!-- hbase master的web ui页面的端口 -->
+	<property>
+		<name>hbase.master.info.port</name>
+		<value>16010</value>
+	</property>
+	<!-- hbase master的web ui页面绑定的地址 -->
+	<property>
+		<name>hbase.master.info.bindAddress</name>
+		<value>0.0.0.0</value>
+	</property>
+	<!-- hbase清理oldlogdir目录下的hlog文件的最长时间 ,单位毫秒 -->
+	<property>
+		<name>hbase.master.logcleaner.ttl</name>
+		<value>600000</value>
+	</property>
+	<!-- 不知道干嘛的 -->
+	<property>
+		<name>hbase.master.catalog.timeout</name>
+		<value>600000</value>
+	</property>
+	<!-- master是否监听master web ui端口并重定向请求给web ui服务器,该配置是master和RegionServer共享 -->
+	<property>
+		<name>hbase.master.infoserver.redirect</name>
+		<value>true</value>
+	</property>
+
+	<!-- hbase regionServer的默认端口 -->
+	<property>
+		<name>hbase.regionserver.port</name>
+		<value>16020</value>
+	</property>
+	<!-- hbase regionServer的web ui的默认端口 -->
+	<property>
+		<name>hbase.regionserver.info.port</name>
+		<value>16030</value>
+	</property>
+	<!-- hbase regionServer的web ui绑定地址 -->
+	<property>
+		<name>hbase.regionserver.info.bindAddress</name>
+		<value>0.0.0.0</value>
+	</property>
+	<!-- 如果regionServer默认的端口被暂用了,是否允许hbase搜索一个可用的端口来绑定 -->
+	<property>
+		<name>hbase.regionserver.info.port.auto</name>
+		<value>false</value>
+	</property>
+	<!-- regionServer端默认开启的RPC监控实例数,也即RegionServer能够处理的IO请求线程数 -->
+	<property>
+		<name>hbase.regionserver.handler.count</name>
+		<value>30</value>
+	</property>
+	<!-- hbase提供的可以用来处理请求的队列数 0.1 * 总数,如果为0则表示所有请求公用一个队列, 如果为1则表示每个请求自己有一个独立的队列 -->
+	<property>
+		<name>hbase.ipc.server.callqueue.handler.factor</name>
+		<value>0.1</value>
+	</property>
+	<!-- hbase提供的读写队列数比例,参数值为0-1之间,如果为0则所有队列同时处理读写请求 -->
+	<!-- 现在假设我们有10个队列 1、该值设置为0,则这10个队列同时处理读写请求 2、该值设置为1,则1个队列处理写情况,9个队列处理读请求 3、该值设置为0.x,则x个队列处理处理读请求,10-x个队列处理写请求 4、根据实际情况,读多写少还是写少读多,可按需配置 -->
+	<property>
+		<name>hbase.ipc.server.callqueue.read.ratio</name>
+		<value>0</value>
+	</property>
+	<!-- hbase提供的用于支持get/scan请求的队列比例 -->
+	<property>
+		<name>hbase.ipc.server.callqueue.scan.ratio</name>
+		<value>0</value>
+	</property>
+	<!-- regionServer发送消息给Master的时间间隔,单位是毫秒 -->
+	<property>
+		<name>hbase.regionserver.msginterval</name>
+		<value>3000</value>
+	</property>
+	<!-- regionServer日志滚动提交的周期,不管这个日志有没有写满 -->
+	<property>
+		<name>hbase.regionserver.logroll.period</name>
+		<value>3600000</value>
+	</property>
+	<!-- 在regionServer上的WAL日志,在停止服务前允许的关闭 WAL 的连续错误数量 比如如果我们日志在滚动提交的是,此时wal写入错误,那么就会立即停止regionServer的服务 默认值2表示运行有2个错误发生 -->
+	<property>
+		<name>hbase.regionserver.logroll.errors.tolerated</name>
+		<value>2</value>
+	</property>
+	<!-- regionServer的WAL文件读取的实现类 -->
+	<property>
+		<name>hbase.regionserver.hlog.reader.impl</name>
+		<value>org.apache.hadoop.hbase.regionserver.wal.ProtobufLogReader
+		</value>
+	</property>
+	<!-- regionServer的WAL文件写的实现类 -->
+	<property>
+		<name>hbase.regionserver.hlog.writer.impl</name>
+		<value>org.apache.hadoop.hbase.regionserver.wal.ProtobufLogWriter
+		</value>
+	</property>
+	<!-- regionServer的全局memstore的大小,超过该大小会触发flush到磁盘的操作,默认是堆大小的40%,而且regionserver级别的 flush会阻塞客户端读写 -->
+	<property>
+		<name>hbase.regionserver.global.memstore.size</name>
+		<value></value>
+	</property>
+	<!--可以理解为一个安全的设置,有时候集群的“写负载”非常高,写入量一直超过flush的量,这时,我们就希望memstore不要超过一定的安全设置。 在这种情况下,写操作就要被阻塞一直到memstore恢复到一个“可管理”的大小, 这个大小就是默认值是堆大小 
+		* 0.4 * 0.95,也就是当regionserver级别 的flush操作发送后,会阻塞客户端写,一直阻塞到整个regionserver级别的memstore的大小为 堆大小 * 0.4 *0.95为止 -->
+	<property>
+		<name>hbase.regionserver.global.memstore.size.lower.limit</name>
+		<value></value>
+	</property>
+	<!-- 内存中的文件在自动刷新之前能够存活的最长时间,默认是1h -->
+	<property>
+		<name>hbase.regionserver.optionalcacheflushinterval</name>
+		<value>3600000</value>
+	</property>
+	<!-- 当使用dns的时候,regionServer用来上报IP地址的网络接口名字 -->
+	<property>
+		<name>hbase.regionserver.dns.interface</name>
+		<value>default</value>
+	</property>
+	<!-- 当使用DNS的时候,RegionServer使用的DNS的域名或者IP 地址,RegionServer用它来确定和master用来进行通讯的域名 -->
+	<property>
+		<name>hbase.regionserver.dns.nameserver</name>
+		<value>default</value>
+	</property>
+	<!-- region在切分的时候的默认切分策略 -->
+	<property>
+		<name>hbase.regionserver.region.split.policy</name>
+		<value>org.apache.hadoop.hbase.regionserver.IncreasingToUpperBoundRegionSplitPolicy
+		</value>
+	</property>
+	<!-- 当某个HRegionServer上的region到达这个限制时,不会在进行region切分,也就是一个HRegionServer默认最大允许有1000个region -->
+	<property>
+		<name>hbase.regionserver.regionSplitLimit</name>
+		<value>1000</value>
+	</property>
+
+	<!-- zk sesscion超时时间 -->
+	<property>
+		<name>zookeeper.session.timeout</name>
+		<value>90000</value>
+	</property>
+	<!-- hbase在zk上默认的根目录 -->
+	<property>
+		<name>zookeeper.znode.parent</name>
+		<value>/hbase</value>
+	</property>
+	<!-- hbase在zk上的节点路径 -->
+	<property>
+		<name>zookeeper.znode.rootserver</name>
+		<value>root-region-server</value>
+	</property>
+	<!-- hbase在zk上节点使用的权限 -->
+	<property>
+		<name>zookeeper.znode.acl.parent</name>
+		<value>acl</value>
+	</property>
+	<!-- zk的使用端口 -->
+	<property>
+		<name>hbase.zookeeper.peerport</name>
+		<value>2888</value>
+	</property>
+	<!-- zk直接执行leader选举时通讯的端口 -->
+	<property>
+		<name>hbase.zookeeper.leaderport</name>
+		<value>3888</value>
+	</property>
+	<!-- zk是否支持多重更新 -->
+	<property>
+		<name>hbase.zookeeper.useMulti</name>
+		<value>true</value>
+	</property>
+	<!-- 是否允许HBaseConfiguration去读取zk的配置文件,不清楚意义是什么? -->
+	<property>
+		<name>hbase.config.read.zookeeper.config</name>
+		<value>false</value>
+	</property>
+
+	<!--Client configurations -->
+	<!-- hbase客户端每次 写缓冲的大小(也就是客户端批量提交到server端),这块大小会同时占用客户端和服务端,缓冲区更大可以减少RPC次数,但是更大意味着内存占用更多 -->
+	<property>
+		<name>hbase.client.write.buffer</name>
+		<value>2097152</value>
+	</property>
+	<!-- 在hbase发生请求失败的情况下,每次重试的等待时间 ,如果某段时间网络持续不好,重试会一直发生,如果还是连不上,就会放弃连接,在重试的过程中,会阻塞其它线程来抢锁,如果长时间的超时会导致业务处理的阻塞 -->
+	<property>
+		<name>hbase.client.pause</name>
+		<value>100</value>
+	</property>
+	<!--重试次数,如果连不上或者fail,会重试 -->
+	<property>
+		<name>hbase.client.retries.number</name>
+		<value>35</value>
+	</property>
+	<!-- 单个Htable实例发送给集群的最大任务数,也就是同一个实例最大的并发数 -->
+	<property>
+		<name>hbase.client.max.total.tasks</name>
+		<value>100</value>
+	</property>
+	<!-- 单个Htable实例发给regionServer的最大的任务并发数 -->
+	<property>
+		<name>hbase.client.max.perserver.tasks</name>
+		<value>5</value>
+	</property>
+	<!-- 客户端到一个region的最大连接数,也就是说如果一个客户端有超过配置项值到某个region的连接,后面的请求会被阻塞 -->
+	<property>
+		<name>hbase.client.max.perregion.tasks</name>
+		<value>1</value>
+	</property>
+	<!-- 在执行hbase scan操作的时候,客户端缓存的行数,设置小意味着更多的rpc次数,设置大比较吃内存 -->
+	<property>
+		<name>hbase.client.scanner.caching</name>
+		<value>2147483647</value>
+	</property>
+	<!--一个KeyValue实例的最大大小,这是存储文件中一个entry的容量上限,因为一个KeyValue是不能分割的, 所有可以避免因为数据过大导致region不可分割 -->
+	<property>
+		<name>hbase.client.keyvalue.maxsize</name>
+		<value>10485760</value>
+	</property>
+	<!-- scan操作中单次rpc的超时时间(比较重要的参数) -->
+	<property>
+		<name>hbase.client.scanner.timeout.period</name>
+		<value>60000</value>
+	</property>
+
+	<!-- HRegion负载迁移的时候的一个配置参数,具体怎么用可看HMaster里面的负载迁移的源代码 -->
+	<property>
+		<name>hbase.regions.slop</name>
+		<value>0.2</value>
+	</property>
+	<!-- 每次线程唤醒的周期 -->
+	<property>
+		<name>hbase.server.thread.wakefrequency</name>
+		<value>10000</value>
+	</property>
+	<!-- 单个region里memstore的缓存大小,超过那么整个HRegion就会flush,默认128M -->
+	<property>
+		<name>hbase.hregion.memstore.flush.size</name>
+		<value>134217728</value>
+	</property>
+	<!--当一个 region 中的 memstore 的大小大于这个值的时候,我们又触发 了 close.会先运行“pre-flush”操作,清理这个需要关闭的 memstore,然后 将这个 region 下线。当一个 region 下线了,我们无法再进行任何写操作。 
+		如果一个 memstore 很大的时候,flush 操作会消耗很多时间。"pre-flush" 操作意味着在 region 下线之前,会先把 memstore 清空。这样在最终执行 close 操作的时候,flush 操作会很快。 -->
+	<property>
+		<name>hbase.hregion.preclose.flush.size</name>
+		<value>5242880</value>
+	</property>
+	<!-- 当一个HRegion上的memstore的大小满足hbase.hregion.memstore.block.multiplier * hbase.hregion.memstore.flush.size, 这个HRegion会执行flush操作并阻塞对该HRegion的写入 -->
+	<property>
+		<name>hbase.hregion.memstore.block.multiplier</name>
+		<value>4</value>
+	</property>
+	<!-- 设置为true,有效减少在高并发写时候的内存碎片 -->
+	<property>
+		<name>hbase.hregion.memstore.mslab.enabled</name>
+		<value>true</value>
+	</property>
+	<!--HStoreFile最大的大小,当某个region的某个列族超过这个大小会进行region拆分 -->
+	<property>
+		<name>hbase.hregion.max.filesize</name>
+		<value>10737418240</value>
+	</property>
+	<!-- 一个region进行 major compaction合并的周期,在这个点的时候, 这个region下的所有hfile会进行合并,默认是7天,major compaction非常耗资源,建议生产关闭(设置为0),在应用空闲时间手动触发 -->
+	<property>
+		<name>hbase.hregion.majorcompaction</name>
+		<value>604800000</value>
+	</property>
+	<!-- 一个抖动比例,意思是说上一个参数设置是7天进行一次合并,也可以有50%的抖动比例 -->
+	<property>
+		<name>hbase.hregion.majorcompaction.jitter</name>
+		<value>0.50</value>
+	</property>
+	<!-- 一个store里面允许存的hfile的个数,超过这个个数会被写到新的一个hfile里面 也即是每个region的每个列族对应的memstore在fulsh为hfile的时候,默认情况下当超过3个hfile的时候就会 对这些文件进行合并重写为一个新文件,设置个数越大可以减少触发合并的时间,但是每次合并的时间就会越长 -->
+	<property>
+		<name>hbase.hstore.compactionThreshold</name>
+		<value>3</value>
+	</property>
+	<!-- 执行flush操作的线程数,设置小了刷新操作会排队,大了会增加底层hdfs的负载压力 -->
+	<property>
+		<name>hbase.hstore.flusher.count</name>
+		<value>2</value>
+	</property>
+	<!-- 每个store阻塞更新请求的阀值,表示如果当前hstore中文件数大于该值,系统将会强制执行compaction操作进行文件合并, 合并的过程会阻塞整个hstore的写入,这样有个好处是避免compaction操作赶不上Hfile文件的生成速率 -->
+	<property>
+		<name>hbase.hstore.blockingStoreFiles</name>
+		<value>10</value>
+	</property>
+	<!-- 每个store阻塞更新请求的超时时间,如果超过这个时间合并操作还未完成,阻塞也会取消 -->
+	<property>
+		<name>hbase.hstore.blockingWaitTime</name>
+		<value>90000</value>
+	</property>
+	<!-- 每个minor compaction操作的 允许的最大hfile文件上限 -->
+	<property>
+		<name>hbase.hstore.compaction.max</name>
+		<value>10</value>
+	</property>
+	<!-- 在执行compaction操作的过程中,每次读取hfile文件的keyValue个数 -->
+	<property>
+		<name>hbase.hstore.compaction.kv.max</name>
+		<value>10</value>
+	</property>
+	<!--LRUBlockCache块缓存的大小,默认为堆大小的40% -->
+	<property>
+		<name>hfile.block.cache.size</name>
+		<value>0.4</value>
+	</property>
+	<!--bucketcache的工作模式,默认有3种可选择,heap,offheap,file。其中heap由jvm分配内存存储,offheap 由操作系统分配内存存储 -->
+	<property>
+		<name>hbase.bucketcache.ioengine</name>
+		<value></value>
+	</property>
+	<!-- 默认为true,意思是combinedcache里面包括了LRU和bucketcache -->
+	<property>
+		<name>hbase.bucketcache.combinedcache.enabled</name>
+		<value>true</value>
+	</property>
+	<!-- 就是bucketcache大小,如果配置的值在0-1直接,表示占用堆内存的百分比,或者配置XXMB也可 -->
+	<property>
+		<name>hbase.bucketcache.size</name>
+		<value></value>
+	</property>
+	<property>
+		<name>hbase.rs.cacheblocksonwrite</name>
+		<value>false</value>
+	</property>
+	<!-- 单次rpc请求的超时时间,如果某次RPC时间超过该值,客户端就会主动关闭socket -->
+	<property>
+		<name>hbase.rpc.timeout</name>
+		<value>60000</value>
+	</property>
+	<!-- 该参数表示HBase客户端发起一次数据操作(一次操作可能有多次rpc)直至得到响应之间总的超时时间 -->
+	<property>
+		<name>hbase.client.operation.timeout</name>
+		<value>1200000</value>
+	</property>
+	<!-- hbase table单行row的最大大小 -->
+	<property>
+		<name>hbase.table.max.rowsize</name>
+		<value>1073741824</value>
+	</property>
+	<!-- 允许快照被使用 -->
+	<property>
+		<name>hbase.snapshot.enabled</name>
+		<value>true</value>
+	</property>
+	<!-- 在hbase重启的时候,如果重启失败了,则使用快照代替,同时成功后删除快照 -->
+	<property>
+		<name>hbase.snapshot.restore.take.failsafe.snapshot</name>
+		<value>true</value>
+	</property>
+	<!-- hbase.server.compactchecker.interval.multiplier * hbase.server.thread.wakefrequency 后台线程每隔多久定期检查是否需要执行compaction -->
+	<property>
+		<name>hbase.server.compactchecker.interval.multiplier</name>
+		<value>1000</value>
+	</property>
+	<!-- hbase colume最大的版本数 -->
+	<property>
+		<name>hbase.column.max.version</name>
+		<value>1</value>
+	</property>
+	<!-- hbase客户端scan操作的时候,每次远程调用返回的最大字节数,默认是2M, 用来限制client从HRegionServer取到的bytes总数,bytes总数通过row的KeyValue计算得出 -->
+	<property>
+		<name>hbase.client.scanner.max.result.size</name>
+		<value>2097152</value>
+	</property>
+	<!-- hbase服务端对scan请求返回的结果大小做限制 -->
+	<property>
+		<name>hbase.server.scanner.max.result.size</name>
+		<value>104857600</value>
+	</property>
+</configuration>

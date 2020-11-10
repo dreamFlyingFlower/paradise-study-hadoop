@@ -1,4 +1,4 @@
-package com.wy.weibo;
+package com.wy.example.weibo;
 
 import java.util.List;
 

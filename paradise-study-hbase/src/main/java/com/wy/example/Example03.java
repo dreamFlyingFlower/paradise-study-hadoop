@@ -4,8 +4,10 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HColumnDescriptor;
-import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
+import org.apache.hadoop.hbase.client.Connection;
+import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
@@ -13,10 +15,14 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
 import org.apache.hadoop.hbase.client.Scan;
+import org.apache.hadoop.hbase.client.Table;
+import org.apache.hadoop.hbase.client.TableDescriptor;
+import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
+import org.apache.hadoop.hbase.util.Bytes;
 
 public class Example03 {
 
-	// 创建表、插入记录、查询一条记录、遍历所有的记录、删除表
+	// 创建表,插入记录,查询一条记录,遍历所有的记录,删除表
 	public static final String TABLE_NAME = "table1";
 
 	public static final String FAMILY_NAME = "family1";
@@ -26,22 +32,22 @@ public class Example03 {
 	public static void main(String[] args) throws Exception {
 		Configuration conf = HBaseConfiguration.create();
 		conf.set("hbase.rootdir", "hdfs://hadoop0:9000/hbase");
-		// 使用eclipse时必须添加这个，否则无法定位
+		// 使用eclipse时必须添加这个,否则无法定位
 		conf.set("hbase.zookeeper.quorum", "hadoop0");
-		// 创建表、删除表使用HBaseAdmin
-		final HBaseAdmin hBaseAdmin = new HBaseAdmin(conf);
+		Connection connection = ConnectionFactory.createConnection(conf);
+		// 创建表,删除表使用HBaseAdmin
+		HBaseAdmin hBaseAdmin = (HBaseAdmin) connection.getAdmin();
 		createTable(hBaseAdmin);
-
-		// 插入记录、查询一条记录、遍历所有的记录HTable
-		final HTable hTable = new HTable(conf, TABLE_NAME);
+		// 插入记录,查询一条记录,遍历所有的记录HTable
+		Table table = connection.getTable(TableName.valueOf(TABLE_NAME));
 		// putRecord(hTable);
 		// getRecord(hTable);
 		// scanTable(hTable);
-		hTable.close();
+		table.close();
 		// deleteTable(hBaseAdmin);
 	}
 
-	private static void scanTable(final HTable hTable) throws IOException {
+	public static void scanTable(final HTable hTable) throws IOException {
 		Scan scan = new Scan();
 		final ResultScanner scanner = hTable.getScanner(scan);
 		for (Result result : scanner) {
@@ -50,29 +56,29 @@ public class Example03 {
 		}
 	}
 
-	private static void getRecord(final HTable hTable) throws IOException {
+	public static void getRecord(final Table hTable) throws IOException {
 		Get get = new Get(ROW_KEY.getBytes());
 		final Result result = hTable.get(get);
 		final byte[] value = result.getValue(FAMILY_NAME.getBytes(), "age".getBytes());
 		System.out.println(result + "\t" + new String(value));
 	}
 
-	private static void putRecord(final HTable hTable) throws IOException {
+	public static void putRecord(final Table hTable) throws IOException {
 		Put put = new Put(ROW_KEY.getBytes());
-		put.add(FAMILY_NAME.getBytes(), "age".getBytes(), "25".getBytes());
+		put.addColumn(FAMILY_NAME.getBytes(), "age".getBytes(), "25".getBytes());
 		hTable.put(put);
 	}
 
-	private static void deleteTable(final HBaseAdmin hBaseAdmin) throws IOException {
-		hBaseAdmin.disableTable(TABLE_NAME);
-		hBaseAdmin.deleteTable(TABLE_NAME);
+	public static void deleteTable(final HBaseAdmin hBaseAdmin) throws IOException {
+		hBaseAdmin.disableTable(TableName.valueOf(TABLE_NAME));
+		hBaseAdmin.deleteTable(TableName.valueOf(TABLE_NAME));
 	}
 
-	private static void createTable(final HBaseAdmin hBaseAdmin) throws IOException {
-		if (!hBaseAdmin.tableExists(TABLE_NAME)) {
-			HTableDescriptor tableDescriptor = new HTableDescriptor(TABLE_NAME);
-			HColumnDescriptor family = new HColumnDescriptor(FAMILY_NAME);
-			tableDescriptor.addFamily(family);
+	public static void createTable(final HBaseAdmin hBaseAdmin) throws IOException {
+		if (!hBaseAdmin.tableExists(TableName.valueOf(TABLE_NAME))) {
+			TableDescriptor tableDescriptor = TableDescriptorBuilder.newBuilder(TableName.valueOf(TABLE_NAME))
+					.setColumnFamily(ColumnFamilyDescriptorBuilder.newBuilder(Bytes.toBytes(FAMILY_NAME)).build())
+					.build();
 			hBaseAdmin.createTable(tableDescriptor);
 		}
 	}
