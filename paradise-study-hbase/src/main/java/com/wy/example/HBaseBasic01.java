@@ -20,7 +20,14 @@ import org.apache.hadoop.hbase.client.TableDescriptor;
 import org.apache.hadoop.hbase.client.TableDescriptorBuilder;
 import org.apache.hadoop.hbase.util.Bytes;
 
-public class Example03 {
+/**
+ * 普通增删改查
+ * 
+ * @author ParadiseWY
+ * @date 2020-11-11 11:18:29
+ * @git {@link https://github.com/mygodness100}
+ */
+public class HBaseBasic01 {
 
 	// 创建表,插入记录,查询一条记录,遍历所有的记录,删除表
 	public static final String TABLE_NAME = "table1";

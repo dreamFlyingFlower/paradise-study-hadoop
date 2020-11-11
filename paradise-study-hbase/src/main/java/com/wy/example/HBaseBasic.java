@@ -8,9 +8,9 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Cell;
 import org.apache.hadoop.hbase.CellUtil;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.MasterNotRunningException;
+import org.apache.hadoop.hbase.NamespaceDescriptor;
 import org.apache.hadoop.hbase.TableName;
-import org.apache.hadoop.hbase.ZooKeeperConnectionException;
+import org.apache.hadoop.hbase.client.Admin;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptor;
 import org.apache.hadoop.hbase.client.ColumnFamilyDescriptorBuilder;
 import org.apache.hadoop.hbase.client.Connection;
@@ -18,6 +18,7 @@ import org.apache.hadoop.hbase.client.ConnectionFactory;
 import org.apache.hadoop.hbase.client.Delete;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.HBaseAdmin;
+import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.ResultScanner;
@@ -33,7 +34,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  * @date 2020-11-10 10:46:20
  * @git {@link https://github.com/mygodness100}
  */
-public class Example01 {
+public class HBaseBasic {
 
 	public static Configuration conf;
 
@@ -44,6 +45,39 @@ public class Example01 {
 		// 设置zk集群参数
 		conf.set("hbase.zookeeper.quorum", "192.168.9.102");
 		conf.set("hbase.zookeeper.property.clientPort", "2181");
+	}
+
+	/**
+	 * 创建命名空间
+	 */
+	public void createNameSpace() {
+		Configuration conf = HBaseConfiguration.create();
+		try (Connection conn = ConnectionFactory.createConnection(conf); Admin admin = conn.getAdmin();) {
+			// 创建名字空间描述符
+			NamespaceDescriptor nsd = NamespaceDescriptor.create("ns2").build();
+			admin.createNamespace(nsd);
+			NamespaceDescriptor[] ns = admin.listNamespaceDescriptors();
+			for (NamespaceDescriptor n : ns) {
+				System.out.println(n.getName());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	/**
+	 * 获得所有命名空间
+	 */
+	public void listNameSpaces() {
+		Configuration conf = HBaseConfiguration.create();
+		try (Connection conn = ConnectionFactory.createConnection(conf); Admin admin = conn.getAdmin();) {
+			NamespaceDescriptor[] ns = admin.listNamespaceDescriptors();
+			for (NamespaceDescriptor n : ns) {
+				System.out.println(n.getName());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**
@@ -97,10 +131,7 @@ public class Example01 {
 	/**
 	 * 删除表
 	 * 
-	 * @param tableName
-	 * @throws MasterNotRunningException
-	 * @throws ZooKeeperConnectionException
-	 * @throws IOException
+	 * @param tableName 表名
 	 */
 	public static void dropTable(String tableName) {
 		try (Connection connection = ConnectionFactory.createConnection(conf);
@@ -120,11 +151,11 @@ public class Example01 {
 	/**
 	 * 向表中插入数据
 	 * 
-	 * @param tableName
-	 * @param rowKey
-	 * @param columnFamily
-	 * @param column
-	 * @param value
+	 * @param tableName 表名
+	 * @param rowKey rowkey
+	 * @param columnFamily 列簇名
+	 * @param column 列
+	 * @param value 值
 	 */
 	public static void addRowData(String tableName, String rowKey, String columnFamily, String column, String value) {
 		// 创建HTable对象
@@ -173,10 +204,17 @@ public class Example01 {
 				Table table = connection.getTable(TableName.valueOf(tableName));) {
 			// 得到用于扫描region的对象
 			Scan scan = new Scan();
+			// 设置扫描器缓存
+			// scan.setCaching(5000);
+			// 设置遍历的起始值
+			// scan.withStartRow(Bytes.toBytes("row5000"));
+			// scan.withStopRow(Bytes.toBytes("row8000"));
 			// 使用HTable得到resultcanner实现类的对象
 			ResultScanner resultScanner = table.getScanner(scan);
 			for (Result result : resultScanner) {
 				Cell[] cells = result.rawCells();
+				byte[] name = result.getValue(Bytes.toBytes("f1"), Bytes.toBytes("name"));
+				System.out.println(Bytes.toString(name));
 				for (Cell cell : cells) {
 					// 得到rowkey
 					System.out.println("行键:" + Bytes.toString(CellUtil.cloneRow(cell)));
@@ -185,6 +223,32 @@ public class Example01 {
 					System.out.println("列:" + Bytes.toString(CellUtil.cloneQualifier(cell)));
 					System.out.println("值:" + Bytes.toString(CellUtil.cloneValue(cell)));
 				}
+				// 通过map遍历
+				// Map<byte[], byte[]> map = result.getFamilyMap(Bytes.toBytes("f1"));
+				// for (Map.Entry<byte[], byte[]> entrySet : map.entrySet()) {
+				// String col = Bytes.toString(entrySet.getKey());
+				// String val = Bytes.toString(entrySet.getValue());
+				// System.out.print(col + ":" + val + ",");
+				// }
+
+				// 得到一行的所有map,key=f1,value=Map<Col,Map<Timestamp,value>>
+				// NavigableMap<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> map =
+				// result.getMap();
+				// for(Map.Entry<byte[], NavigableMap<byte[], NavigableMap<Long, byte[]>>> entry :
+				// map.entrySet()){
+				// //得到列族
+				// String f = Bytes.toString(entry.getKey());
+				// Map<byte[], NavigableMap<Long, byte[]>> colDataMap = entry.getValue();
+				// for(Map.Entry<byte[], NavigableMap<Long, byte[]>> ets : colDataMap.entrySet() ){
+				// String c = Bytes.toString(ets.getKey());
+				// Map<Long, byte[]> tsValueMap = ets.getValue();
+				// for(Map.Entry<Long,byte[]> e : tsValueMap.entrySet()){
+				// Long ts = e.getKey() ;
+				// String value = Bytes.toString(e.getValue());
+				// System.out.print(f+":"+c+":"+ts+"=" +value + ",");
+				// }
+				// }
+				// }
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -217,7 +281,7 @@ public class Example01 {
 	}
 
 	/**
-	 * 获取某一行指定“列族:列”的数据
+	 * 获取某一行指定列族:列的数据
 	 * 
 	 * @param tableName
 	 * @param rowKey
@@ -239,5 +303,41 @@ public class Example01 {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+
+	/**
+	 * 按照指定版本数查询
+	 */
+	public void getWithVersions() throws IOException {
+		Configuration conf = HBaseConfiguration.create();
+		Connection conn = ConnectionFactory.createConnection(conf);
+		TableName tname = TableName.valueOf("ns1:t3");
+		Table table = conn.getTable(tname);
+		Get get = new Get(Bytes.toBytes("row1"));
+		// 检索所有版本
+		get.readAllVersions();
+		Result r = table.get(get);
+		List<Cell> cells = r.getColumnCells(Bytes.toBytes("f1"), Bytes.toBytes("name"));
+		for (Cell c : cells) {
+			String f = Bytes.toString(c.getFamilyArray());
+			String col = Bytes.toString(c.getQualifierArray());
+			long ts = c.getTimestamp();
+			String val = Bytes.toString(c.getValueArray());
+			System.out.println(f + "/" + col + "/" + ts + "=" + val);
+		}
+	}
+
+	/**
+	 * 计数器
+	 */
+	public void testIncr() throws IOException {
+		Connection conn = ConnectionFactory.createConnection(conf);
+		TableName tname = TableName.valueOf("ns1:t8");
+		Table t = conn.getTable(tname);
+		Increment incr = new Increment(Bytes.toBytes("row1"));
+		incr.addColumn(Bytes.toBytes("f1"), Bytes.toBytes("daily"), 1);
+		incr.addColumn(Bytes.toBytes("f1"), Bytes.toBytes("weekly"), 10);
+		incr.addColumn(Bytes.toBytes("f1"), Bytes.toBytes("monthly"), 100);
+		t.increment(incr);
 	}
 }

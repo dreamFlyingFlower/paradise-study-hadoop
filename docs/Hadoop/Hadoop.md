@@ -411,7 +411,7 @@
 
 
 
-# 优点
+## 优点
 
 * MR易于编程,简单的实现一些接口就可以完成一个分布式程序
 * 良好的扩展性,可以通过增加机器来增加程序的计算能力
@@ -420,7 +420,7 @@
 
 
 
-# 缺点
+## 缺点
 
 * MR不适合做实时计算,流式计算,DAG(有向图)计算
 * 实时计算:因为MR是读取磁盘上的文件,做处理比较慢
@@ -429,7 +429,7 @@
 
 
 
-# 核心
+## 核心
 
 * 分布式运算程序分为Map和Reduce阶段
 * MapTask实例:负责Map阶段的整个数据处理,完全并行运行,互不干涉
@@ -442,11 +442,11 @@
 
 
 
-# 编程规范
+## 编程规范
 
 
 
-## Mapper阶段
+### Mapper阶段
 
 1. 用户自定义的Mapper要继承自己的父类
 2. Mapper的输入数据是KV对的形式
@@ -456,7 +456,7 @@
 
 
 
-## Reducer阶段
+### Reducer阶段
 
 1. 用户自定义的Reducer要继承自己的父类
 2. Reducer的输入数据类型对应Mapper的输出数据类型,也是KV
@@ -465,7 +465,7 @@
 
 
 
-## Driver阶段
+### Driver阶段
 
 1. 相当于YARN集群的客户端,用于提交整个程序到YARN集群,提交的是封装了MR程序相关运行参数的job对象
 2. 获取配置信息,获取job对象实例
@@ -579,7 +579,7 @@
 
 
 
-# GroupingComparator分组（辅助排序）
+# GroupingComparator分组(辅助排序)
 
 * 对Reduce阶段的数据根据某一个或几个字段进行分组
 
@@ -611,7 +611,7 @@
 
 
 
-# ResourceManager(rm)
+## ResourceManager(rm)
 
 * 资源管理,一个集群只有一个RM是活动状态
 
@@ -622,7 +622,7 @@
 
 
 
-# NodeManager(nm)
+## NodeManager(nm)
 
 * 节点管理,集群中有N个,负责单个节点的资源管理和使用以及task运行状况
 
@@ -632,7 +632,7 @@
 
 
 
-# ApplicationMaster
+## ApplicationMaster
 
 * 每个应用/作业对应一个,并分配给内部任务
 
@@ -643,13 +643,13 @@
 
 
 
-# Container
+## Container
 
 * 对任务运行环境的抽象,封装了CPU,内存等多维资源以及环境变量,启动命令等任务信息
 
 
 
-# 执行流程
+## 执行流程
 
 * 用户向YRAN提交作业
 * RM为该作业分配第一个Container(AM)
@@ -661,7 +661,7 @@
 
 
 
-# yarn-site.xml
+## yarn-site.xml
 
 ```xml
 <!-- 单个任务可申请的最小虚拟CPU个数 -->
@@ -1012,7 +1012,7 @@
 
 
 * Hadoop的HA严格来说应该分成各个组件的HA机制:HDFS的HA和YARN的HA
-* Hadoop2.0之前,在HDFS集群中NameNode存在单点故障
+* Hadoop2.0之前,在HDFS集群中NameNode存在单点故障,2.0也只能有2个NN
 * NameNode主要在以下两个方面影响HDFS集群
   * NameNode机器发生意外,如宕机,集群将无法使用,直到管理员重启
   * NameNode机器需要升级,包括软件,硬件升级,此时集群也将无法使用
@@ -1200,7 +1200,7 @@ bin/hdfs namenode -format
 sbin/hadoop-daemon.sh start namenode
 ```
 
-* 在[nn2]上,同步nn1的元数据信息
+* 在[nn2]上,同步nn1的元数据信息,并将nn2切换成待命状态
 
 ```shell
 bin/hdfs namenode -bootstrapStandby
@@ -1266,6 +1266,8 @@ bin/hdfs haadmin -getServiceState nn1
   * kill -9 namenode的进程id
   * 将Active NameNode机器断开网络
   * service network stop
+* hdfs haadmin -failover nn1 nn2:模拟容灾演示,将nn1切换到nn2
+* hdfs haadmin -transitionToActive --forceactive nn2:强行将nn2激活
 
 
 
@@ -1395,6 +1397,148 @@ bin/hdfs haadmin -transitionToActive nn1
 * 查看服务状态:bin/yarn rmadmin -getServiceState rm1
 
 ![](server-status.png)
+
+
+
+## 非HA转HA
+
+* 复制原NN的metadate到另外一个NN上:
+
+  ```shell
+  scp -r /app/hadoop/dfs root@hadoop002/app/hadoop
+  ```
+
+* 在新的NN(还未格式化)上运行格式化命令,需要主NN为启动状态
+
+  ```shell
+  hdfs namenode -bootstrapStandby
+  ```
+
+* 在一个NN上执行以下命令,完成edit日志到jn节点的传输
+
+  ```shell
+  hdfs namenode -initializeSharedEdits
+  ```
+
+* 启动所有节点
+
+  ```shell
+  # 主NN
+  hadoop-daemon.sh start namenode
+  hadoop-daemons.sh start datanode
+  # 备份NN
+  hadoop-daemon.sh start namenode
+  ```
+
+
+
+## 从0开始部署HA
+
+
+
+### Hadoop部署
+
+* 停掉hadoop的所有进程
+* 删除所有节点的日志和本地数据
+* 改换hadoop符号连接为ha
+* 登录每台(s202-s204)JN节点主机,启动JN进程:hadoop-daemon.sh start journalnode
+* 登录其中一个NN,格式化文件系统(s201):hadoop namenode -format
+* 复制s201目录的下nn的元数据到s206:scp -r ~/hadoop/* centos@s206:/app/hadoop
+* 在未格式化的NN(s206)节点上做standby引导
+  * 需要保证s201的NN启动:hadoop-daemon.sh start namenode
+  * 登录到s206节点,做standby引导:hdfs namenode -bootstrapStandby
+  * 登录201,将s201的edit日志初始化到JN节点:hdfs namenode -initializeSharedEdits
+* 启动所有数据节点:hadoop-daemons.sh start datanode
+* 登录到206,启动NN:hadoop-daemon.sh start namenode
+* 查看WebUI:http://s201:50070/,http://s206:50070/
+
+
+
+### NN自动容灾
+
+* 自动容灾引入两个组件,zk quarum+zk容灾控制器(ZKFC).
+
+* 运行NN的主机还要运行ZKFC进程,主要负责:
+
+  * 健康监控
+  * session管理
+  * 选举
+
+* 停止所有进程:stop-all.sh
+
+* 配置hdfs-site.xml,启动自动容灾
+
+  ```xml
+  <property>
+      <name>dfs.ha.automatic-failover.enabled</name>
+      <value>true</value>
+  </property>
+  ```
+
+* 配置core-site.xml,指定ZK连接地址
+
+  ```xml
+  <property>
+      <name>ha.zookeeper.quorum</name>
+      <value>s201:2181,s202:2181,s203:2181</value>
+  </property>
+  ```
+
+* 分发以上两个文件到所有节点
+
+* 登录其中的一台NN(s201),在ZK中初始化HA状态:hdfs zkfc -formatZK
+
+* 启动HDFS进程:start-dfs.sh
+
+* 测试自动容在(206是活跃节点):kill -9
+
+
+
+### RM自动容灾
+
+* 配置yarn-site.xml
+
+```xml
+<property>
+    <name>yarn.resourcemanager.ha.enabled</name>
+    <value>true</value>
+</property>
+<property>
+    <name>yarn.resourcemanager.cluster-id</name>
+    <value>cluster1</value>
+</property>
+<property>
+    <name>yarn.resourcemanager.ha.rm-ids</name>
+    <value>rm1,rm2</value>
+</property>
+<property>
+    <name>yarn.resourcemanager.hostname.rm1</name>
+    <value>s201</value>
+</property>
+<property>
+    <name>yarn.resourcemanager.hostname.rm2</name>
+    <value>s206</value>
+</property>
+<property>
+    <name>yarn.resourcemanager.webapp.address.rm1</name>
+    <value>s201:8088</value>
+</property>
+<property>
+    <name>yarn.resourcemanager.webapp.address.rm2</name>
+    <value>s206:8088</value>
+</property>
+<property>
+    <name>yarn.resourcemanager.zk-address</name>
+    <value>s201:2181,s202:2181,s203:2181</value>
+</property>
+```
+* 使用管理命令:
+  * 查看状态:yarn rmadmin -getServiceState rm1
+  * 切换状态到standby:yarn rmadmin -transitionToStandby rm1
+* 启动yarn集群:start-yarn.sh
+* hadoop没有启动两个RM,需要手动启动另外一个:yarn-daemon.sh start resourcemanager
+* 查看webui
+* 做容灾模拟:kill -9
 
 
 

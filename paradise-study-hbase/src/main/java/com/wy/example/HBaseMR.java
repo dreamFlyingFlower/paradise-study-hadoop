@@ -24,7 +24,7 @@ import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
  * @date 2020-11-10 17:05:45
  * @git {@link https://github.com/mygodness100}
  */
-public class Example02 {
+public class HBaseMR {
 
 	static class BatchImportMapper extends Mapper<LongWritable, Text, LongWritable, Text> {
 
