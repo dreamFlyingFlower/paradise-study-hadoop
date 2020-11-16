@@ -1,11 +1,15 @@
 package com.wy.hdfs;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -34,9 +38,20 @@ public class HdfsClient {
 		// 直接获得客户端对象,最后一个参数是访问hadoop的用户
 		// FileSystem.get(new URI("http://hadoop001:9000"), configuration, "hadoop");
 		// 利用configuration获得hdfs客户端对象,该方式需要在启动的时候添加-DHADOOP_USER_NAME=root
-		try (FileSystem fs = FileSystem.get(configuration);) {
-			// 在hdfs上创建路径
+		try (FileSystem fs = FileSystem.get(configuration);
+				FSDataInputStream fis = fs.open(new Path("/test/index.html"));) {
+			// 在hdfs上创建目录
 			fs.mkdirs(new Path("/test/test001"));
+			// 访问文件
+			byte[] buf = new byte[1024];
+			int len = -1;
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			while ((len = fis.read(buf)) != -1) {
+				baos.write(buf, 0, len);
+			}
+			System.out.println(new String(baos.toByteArray()));
+			// 将文件下载到本地
+			IOUtils.copyBytes(fis, new FileOutputStream(new File("/app/test/inde.html")), configuration);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -52,6 +67,10 @@ public class HdfsClient {
 		configuration.set("dfs.replication", "2");
 		try (FileSystem fs = FileSystem.get(new URI("http://hadoop001:9000"), configuration, "hadoop");) {
 			fs.copyFromLocalFile(new Path("d:/test/test002.txt"), new Path("/test/test002.txt"));
+			// 写入文件的同时定制副本数和blocksize
+			fs.create(new Path("/test/test003.txt"), true, 1024, (short) 2, 1024);
+			// 第二个参数:若删除的是一个目录,是否递归参数
+			fs.delete(new Path("/test/test003.txt"), true);
 		} catch (IOException | InterruptedException | URISyntaxException e) {
 			e.printStackTrace();
 		}
