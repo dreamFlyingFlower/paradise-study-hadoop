@@ -73,6 +73,66 @@ for(i <- 1 to 3;j <- 1 to 3 if i!=j){
   l;
   ```
 
+
+
+
+## isInstanceOf
+
+* 判断或输出变量的类型,会直接输出变量的类型
+
+* 基本类只能使用无参方法, 引用类型可使用带参数方法
+
+  ```scala
+  var a=1;
+  a.isInstanceOf; // Int
+  a.isInstanceOf[Int]; // error
+  class a{
+  }
+  var s = new a();
+  s.isInstanceOf[a];// true
+  ```
+
+
+
+## asInstanceOf
+
+* 类型转换,只能引用类型转换,基本类型不可使用
+
+  ```scala
+  class a{}
+  class b extends a{}
+  var s = new b();
+  b.asInstanceOf[a]; // 强转
+  ```
+
+
+
+## classOf
+
+* 类似Java中class进行比较的方法,精准比较,只能是同一份字节码
+
+  ```scala
+  class a{}
+  class b extends a{}
+  var s = new b();
+  s.getClass() == classOf[b]; // true
+  s.getClass() == classOf[a]; // false
+  ```
+
+
+
+## match
+
+* 和Java中是switch.case效果一样,没有break,默认使用_
+
+  ```scala
+  str match{// match是关键字,等价于switch
+  	case 'sss' => dosomething1
+  	case 'dfd' => dosomething2
+  	case _ => dosomething3 // 默认值
+  }
+  ```
+
   
 
 
@@ -80,7 +140,7 @@ for(i <- 1 to 3;j <- 1 to 3 if i!=j){
 # 变量
 
 * 定义变量时可不指定类型,编译器会自动推断.也可以指定类型
-  * val ttt=1:定义一个不可变的变量,类型需要自定推断,和Java的final一样
+  * val ttt=1:定义一个不可变的变量,类型自动推断,和Java的final一样
   * val ttt:Int=11:定义一个不可变的变量,类型指定为int
   * val ttt:Any=100:定义一个不可变的变量,类型可以是任意类型,即使推断为int也可以后期更改
 * val:修饰变量不可变,类似java的final,常量.定义变量时可不指定
@@ -436,7 +496,28 @@ class Car{
 object Car{
     def run() = println("run...")
 }
-// trait:特质,等价于java中的接口
+// trait:特质,等价于java中的接口,但是scala中实现接口仍然用extends
+// 若需要实现多实现,则需要第一个用extends,后面的都用with
+trait parent{
+    // 默认为静态方法,所以才能有方法体.但是parent不可以调用该方法,只能子类实例调用
+    def a()= println("fdsfds");
+    def b():Int; // 抽象方法
+}
+trait parent1{}
+trait parent2{}
+// 在scala中的接口实现,重写方法也不需要写override
+class son extends parnet{
+    // 重写父类抽象方法
+    def b(){
+        1;
+    }  
+}
+class son extends parnet with parent1 with parent2{
+    // 重写父类抽象方法
+    def b(){
+        1;
+    }  
+}
 // 抽象类
 abstract class Dog(var Str:String){
     // 定义一个抽象方法,无返回值
