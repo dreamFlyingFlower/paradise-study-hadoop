@@ -38,3 +38,7 @@ log
 /nbdist/
 /.nb-gradle/
 /node_modules/
+
+### scala
+.cache-main
+.cache-tests
