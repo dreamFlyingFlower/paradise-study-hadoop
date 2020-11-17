@@ -20,6 +20,15 @@ object Declare {
   var i, j = 0
   var greeting2, message: String = null
 
+  // 多值匹配赋值
+  val (z, y) = (1, 2) // z=1,y=2
+
+  val (q, r) = BigInt(10) /% 3
+
+  val arr = Array(1, 7, 2, 9)
+
+  val Array(first, second, _*) = arr
+
   // 隐式转换成RichInt
   var s = 1.toString();
   print(s);

@@ -11,5 +11,6 @@
   	<module>paradise-study-scala</module>
   	<module>paradise-study-storm</module>
   	<module>paradise-study-hive</module>
+  	<module>paradise-study-spark</module>
   </modules>
 </project>
