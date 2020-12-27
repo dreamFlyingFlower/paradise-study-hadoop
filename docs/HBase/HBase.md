@@ -5,7 +5,7 @@
 # 概述
 
 * 是一个高可靠,高性能,面向列的,可扩展的分布式开源数据库,适用于非结构化数据的存储
-* 高可靠性:HBase非常稳定
+* 高可靠性:hbase非常稳定
 * 高性能:可以存储上亿或十亿级别的数据,可以实现毫秒级别的查询
 * 面向列:数据是按照列存储,列簇必须在创建表的时候就指定
 * 可扩展:可以很方便的添加或删除一个节点,包括RegionServer和HDFS
@@ -37,9 +37,9 @@
 
 # 特性
 
-* 对小文件支持比较好,对大文件的支持无法满足
+* 对小文件支持比较好,对大文件的支持无法满足.可以将大文件直接存储到HDFS中,HBase只存储索引信息
 
-* 因HBase的设计,会发生比较耗时的Compact和Split操作,文件存储会比较频繁的触发这些操作
+* 因HBase的设计,会发生比较耗时的Compact和Split操作,频繁的文件存储会触发这些操作.可以将HBase的memstore尽量调大,避免文件上传频繁flush,需要根据业务设定
 
 * 不适合复杂的检索功能
 
@@ -106,7 +106,7 @@
 
 
 
-## 概述
+## 组件
 
 * HMaster:中央节点
   * 将Region分配给RegionServer
@@ -120,26 +120,41 @@
   * 每个RegionServer只会处理一个CF数据,当CF数据值达到某个阀值时,会划分更多的Region来存储CF数据
   * 维护HLog,执行压缩
   * 运行在DataNode上,数量可以与DataNode数量相同
-* Write-Ahead logs:HBase的修改记录,当对HBase读写数据时,数据不是直接写进磁盘,它会在内存中保留一段时间,保留时间以及数据量阈值可以设定.但把数据保存在内存中可能有更高的概率引起数据丢失,为了解决这个问题,数据会先写在一个叫做Write-Ahead logfile的文件中,然后再写入内存中.所以在系统出现故障的时候,数据可以通过这个日志文件重建
-* Region:是HBase存储的最小单元,HBase的基本单位,表的分片,HBase表会根据RowKey值被切分成不同的Region存储在RegionServer中,一个RegionServer中可以有多个不同的Region
-* Store:每个Region中都会包含一个或多个Store,用来接收和访问数据,HFile存储在Store中,一个Store对应HBase表中的一个列簇
+* Write-Ahead logs:hbase的修改记录,当对hbase读写数据时,数据不是直接写进磁盘,它会在内存中保留一段时间,保留时间以及数据量阈值可以设定.但把数据保存在内存中可能有更高的概率引起数据丢失,为了解决这个问题,数据会先写在一个叫做Write-Ahead logfile的文件中,然后再写入内存中.所以在系统出现故障的时候,数据可以通过这个日志文件重建
+* Region:是hbase存储的最小单元,hbase的基本单位,表的分片,hbase表会根据RowKey值被切分成不同的Region存储在RegionServer中,一个RegionServer中可以有多个不同的Region
+* Store:每个Region中都会包含一个或多个Store,用来接收和访问数据,HFile存储在Store中,一个Store对应hbase表中的一个列簇
 * MemStore:每个Store中都会存在一个MemStore,是数据在内存中的实体,而且是有序的.当内存中的数据达到一定值之后,会创建一个Storefile,并将内存中的数据转入到Storefile中
-* Storefile:由MemStore创建,是数据最终在HBase中的存储的位置.Storefile是HFile的一层封装,HFile是HDFS的基础,此时数据就将存储到HDFS中
+* Storefile:由MemStore创建,是数据最终在hbase中的存储的位置.Storefile是HFile的一层封装,HFile是HDFS的基础,此时数据就将存储到HDFS中
 * HLog:存在于每个RegionServer中,只有一个,是为了保证内存中的数据不丢失而存在,类似于Mysql的bin.log.数据会先在HLog中写入更新操作的日志,之后才会在MemStore中写入数据
 * HFie:磁盘上保存原始数据的实际的物理文件,是实际的存储文件.StoreFile是以Hfile的形式存储在HDFS的
 
-* HBase启动
-  * 将自己注册到zk(zookeeper)的backup节点中,因为开始时会有多个HMaster节点,需要进行抢占才能成为活动的HMaster
-  * 抢占完成之后会将该节点从backup节点中删除,此时HMaster才会开始初始化一些数据,之后HMaster将等待RegionServer汇报
-  * 此时RegionServer在zk中注册,并向HMaster汇报,HMaster就会存储可以使用的RegionServer信息,同时开始分配任务
-  * 对所有RegionServer(包括已经失效的)数据进行整理,分配Region和Meta信息,将这些信息交给zk
-* RegionServer失效
-  * HMaster将失效的RegionServer上的Region分配到其他节点
-  * HMaster更新HBase:meta表以保证数据正常访问
-* HMaster失效
-  * 集群模式下,由zk中处于backup状态的其他HMaster节点推选一个转为Active状态
-  * 非集群模式下,HMaster挂了,数据仍旧能正常读写,因为是由RegionServer来完成,但是不能创建删除表,也不能更改表结构
-* HBase架构
+
+
+
+## HBase启动
+
+* 将自己注册到zk(zookeeper)的backup节点中,因为开始时会有多个HMaster节点,需要进行抢占才能成为活动的HMaster
+* 抢占完成之后会将该节点从backup节点中删除,此时HMaster才会开始初始化一些数据,之后HMaster将等待RegionServer汇报
+* 此时RegionServer在zk中注册,并向HMaster汇报,HMaster就会存储可以使用的RegionServer信息,同时开始分配任务
+* 对所有RegionServer(包括已经失效的)数据进行整理,分配Region和Meta信息,将这些信息交给zk
+
+
+
+## RegionServer失效
+
+* HMaster将失效的RegionServer上的Region分配到其他节点
+* HMaster更新HBase:meta表以保证数据正常访问
+
+
+
+## HMaster失效
+
+* 集群模式下,由zk中处于backup状态的其他HMaster节点推选一个转为Active状态
+* 非集群模式下,HMaster挂了,数据仍旧能正常读写,因为是由RegionServer来完成,但是不能创建删除表,也不能更改表结构
+
+
+
+## HBase架构
 
 ![](HBaseSystem.png)
 
@@ -169,7 +184,7 @@
 
 ## Row
 
-* 在表里面,每行代表一个数据对象,每行都是一个行键(RowKey)进行唯一标识
+* 在表里面,每行代表一个数据对象,每行都是一个行键(RowKey)进行唯一标识.行键可以是任何数据,在库中均以二进制的字节存储
 
 
 
@@ -287,7 +302,7 @@
   * TTL过期数据
   * 版本号超过设定版本号的数据
 * Compact默认是开启的,大小为10G,可以因为业务的需求而关闭,然后自行设计合并操作
-* 何时会执行Compact:当MemStore中内容被Flush到磁盘时,用户执行shell命令Compact,Major_Compact或调用了相关的API,HBase后台周期性触发检查
+* 何时会执行Compact:当MemStore中内容被Flush到磁盘时,用户执行shell命令Compact,Major_Compact或调用了相关的API,hbase后台周期性触发检查
 * 当HRegionServer宕机后,将HRegionServer上的hlog拆分,然后分配给不同的HRegionServer加载,修改.META
 * HLog会同步到HDFS
 
@@ -305,21 +320,21 @@
 
 ## 单机版
 
-* 下载解压HBase安装包到/app/HBase中
+* 下载解压hbase安装包到/app/hbase中
 
 * 配置Java环境变量
 
-* 进入conf目录,配置HBase-site.xml文件
+* 进入conf目录,配置hbase-site.xml文件
 
   ```xml
   <!-- 指定HBase的数据目录,若不设置,默认在/tmp目录下 -->
   <property>
-  	<name>HBase.rootdir</name>
-  	<value>file:///app/HBase/data</value>
+  	<name>hbase.rootdir</name>
+  	<value>file:///app/hbase/data</value>
   </property>
   ```
 
-* 启动:bin/start-HBase.sh
+* 启动:bin/start-hbase.sh
 
 * jps查看进程:HMaster,HRegionServer
 
@@ -329,17 +344,17 @@
 
 ## 伪分布式
 
-* 在单机的基础上修改HBase-site.xml
+* 在单机的基础上修改hbase-site.xml
 
   ```xml
   <!-- 指定HBase在hdfs上的根目录,集群写集群的NN地址 -->
   <property>
-      <name>HBase.rootdir</name>
-      <value>hdfs://localhost:9000/HBase</value>
+      <name>hbase.rootdir</name>
+      <value>hdfs://localhost:9000/hbase</value>
   </property>
   <!-- 指定HBase是否以集群的方式运行 -->
   <property>
-      <name>HBase.cluster.distributed</name>
+      <name>hbase.cluster.distributed</name>
       <value>true<value>
   </property>
   ```
@@ -354,7 +369,7 @@
 
 * 集群依赖于Hadoop,ZK集群,先将Hadoop,ZK集群搭建成功
 
-* 下载HBase压缩包,解压到指定目录,修改HBase-env.sh
+* 下载hbase压缩包,解压到指定目录,修改hbase-env.sh
 
   ```shell
   # jdk路径
@@ -366,30 +381,30 @@
   export HBase_MANAGES_ZK = false
   ```
 
-* 修改HBase-site.xml
+* 修改hbase-site.xml
 
   ```xml
-  <!-- 指定HBase在hdfs上的根目录,集群写集群的NN地址 -->
+  <!-- 指定hbase在hdfs上的根目录,集群写集群的NN地址 -->
   <property>
-      <name>HBase.rootdir</name>
+      <name>hbase.rootdir</name>
       <!-- 伪分布式模式下可以写hdfs的地址 -->
-      <!-- <value>hdfs://localhost:9000/HBase</value> -->
+      <!-- <value>hdfs://localhost:9000/hbase</value> -->
       <!-- 集群模式下填写hadoop集群地址 -->
-      <value>hdfs://cluster/HBase</value>
+      <value>hdfs://cluster/hbase</value>
   </property>
-  <!-- 指定HBase是否以集群的方式运行 -->
+  <!-- 指定hbase是否以集群的方式运行 -->
   <property>
-      <name>HBase.cluster.distributed</name>
+      <name>hbase.cluster.distributed</name>
       <value>true</value>
   </property>
   <!-- 0.98后的新变动,之前版本没有.port,默认端口为60000 -->
   <property>
-      <name>HBase.master.port</name>
+      <name>hbase.master.port</name>
       <value>16000</value>
   </property>
   <!-- 若不使用自带的zk,需配置zk集群地址,多个用逗号隔开 -->
   <property>
-      <name>HBase.zookeeper.quorum</name>
+      <name>hbase.zookeeper.quorum</name>
       <value>localhost:2181</value>
   </property>
   <!-- <property>
@@ -399,27 +414,27 @@
   </property>
   <!-- 指定zookeeper的存储路径 -->
   <property>
-      <name>HBase.zookeeper.property.dataDir</name>
+      <name>hbase.zookeeper.property.dataDir</name>
       <value>/app/zookeeper/datas</value>
   </property>
   <!-- memstore的内存刷新大小,默认128M,可以设置成256M,单位为字节 -->
   <property>
-      <name>HBase.hRegion.memstore.flush.size</name>
+      <name>hbase.hregion.memstore.flush.size</name>
       <value>268435456</value>
   </property>
-  <!-- 最大storefile大小,超过这个大小,HBase将开始合并storefile,而存储这个storefile的Region将被切割,默认是10G -->
+  <!-- 最大storefile大小,超过这个大小,hbase将开始合并storefile,而存储这个storefile的Region将被切割,默认是10G -->
   <property>
-      <name>HBase.hRegion.max.filesize</name>
+      <name>hbase.hregion.max.filesize</name>
       <value>10737418240</value>
   </property>
   <!-- Region中所有storefile的major compactions时间间隔,默认1天,0表示禁用这个功能 -->
   <property>
-      <name>HBase.hRegion.majorcompaction</name>
+      <name>hbase.hregion.majorcompaction</name>
       <value>0</value>
   </property>
   <!-- 当时间不同步时,可以设置该值更大点,但最好是将时间同步-->
   <property>
-      <name>HBase.master.maxclockskew</name>
+      <name>hbase.master.maxclockskew</name>
       <value>180000</value>
   </property>
   ```
@@ -428,20 +443,20 @@
 
 * 将Hadoop的core-site.xml和hdfs-site.xml复制到HBase的conf目录下,或者建立软连接
 
-* 将HBase目录整个传输或复制到其他服务器相同目录下
+* 将hbase目录整个传输或复制到其他服务器相同目录下
 
-* 启动HBase:进入HBase/bin下,
+* 启动hbase:进入hbase/bin下,
 
-  * sh start-HBase.sh,或者下面2个命令依次执行
-  * HBase-daemon.sh start master
-  * HBase-daemon.sh start Regionserver
+  * sh start-hbase.sh,或者下面2个命令依次执行
+  * hbase-daemon.sh start master
+  * hbase-daemon.sh start Regionserver
   * 会显示启动了zk,master,Regionserver
 
 * jps:显示HMaster,HRegionServer,HQuorumPeer
 
 * 若集群之间时间不同步,会抛出ClockOutOfSyncException异常,需要进行时间同步
 
-* 进入到HBase的命令行:./HBase shell,进入控制台后,执行status,会显示当前HBase的状态
+* 进入到hbase的命令行:./hbase shell,进入控制台后,执行status,会显示当前hbase的状态
 
 * 启动成功后,可以通过ip:port访问管理页面,默认端口是16010
 
@@ -484,7 +499,7 @@
 
 
 
-# 与Hadoop的HA集成
+# 集成HadoopHA
 
 * 在HBase-env.sh文件添加hadoop配置文件目录到HBase_CLASSPATH环境变量并分发
 
@@ -514,7 +529,7 @@
 
 # HBaseShell
 
-* bin/HBase shell:进入HBase控制台
+* bin/hbase shell:进入hbase控制台
 * help:查看帮助命令
 * list:查看存在那些表
 * list_namespace:查看所有的命名空间,类似于MySQL中的数据库
@@ -828,7 +843,8 @@
   ```shell
   # 打开HBase的shell控制台:原表为table1,备份表为table2,备份表的名字可以和原表不一样,但是table2的列簇要和原表一样
   # table2创建好之后,在HBase中执行如下
-  HBase org.apache.hadoop.HBase.mapreduce.CopyTable --new.name=table2 table1
+  # 其实只实行CopyTable这个类,从那数是new.name,table2是目的表,table1是原表
+  hbase org.apache.hadoop.hbase.mapreduce.CopyTable --new.name=table2 table1
   ```
 
 
@@ -840,21 +856,21 @@
 * export导出工具与copytable一样是依赖HBase的scan读取数据
 
   ```shell
-  # 到处Export:tablename是需要备份的表,紧接的是备份的地址以及备份的文件名,版本号,开始时间,结束时间可选
-  HBase org.apache.hadoop.HBase.mapreduce.Export tablename hdfs://namenode:9000/bakdir [version] [starttime] [endtime]
+  # 导出Export:tablename是需要备份的表,紧接的是备份的地址以及备份的文件名,版本号,开始时间,结束时间可选
+  hbase org.apache.hadoop.hbase.mapreduce.Export tablename hdfs://namenode:9000/bakdir [version] [starttime] [endtime]
   # 导入Import:
-  HBase [-DHBase.import.version=0.94] org.apache.hadoop.HBase.mapreduce.Import tablename bakdir
+  hbase [-Dhbase.import.version=0.94] org.apache.hadoop.hbase.mapreduce.Import tablename bakdir
   ```
 
 
 
 ## Snapshot
 
-* snapshot即快照功能,通过配置HBase-site.xml开始该功能
+* snapshot即快照功能,通过配置hbase-site.xml开始该功能
 
   ```xml
   <property>
-  	<name>HBase.snapshot.enabled</name>
+  	<name>hbase.snapshot.enabled</name>
   	<value>true</value>
   </property>
   ```
@@ -870,18 +886,18 @@
 
 ## Replication
 
-* 可以通过replication机制实现HBase集群的主从模式,通过配置HBase-site.xml开始该功能
+* 可以通过replication机制实现hbase集群的主从模式,通过配置hbase-site.xml开始该功能
 
   ```xml
   <property>
-  	<name>HBase.replication</name>
+  	<name>hbase.replication</name>
   	<value>true</value>
   </property>
   ```
 
 * replication是依赖WAL日志进行的同步,所以必须开启WAL
   * 在源集群及目标集群都创建同名表
-  * 指定目标集群zk地址和路径:add_peer '1',"zk01:2181:/HBase_backup";(1:一个id值,在下面的复制上要用)
+  * 指定目标集群zk地址和路径:add_peer '1',"zk01:2181:/hbase_backup";(1:一个id值,在下面的复制上要用)
   * 标注需要备份的列簇信息及备份的目标库地址
   * replication_scope值为上面add_peer指定的值
   * disable 'tablename';alter 'tablename',{NAME=>'f1',REPLICATION_SCOPE=>'1'}
